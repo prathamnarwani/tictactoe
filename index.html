@@ -1,0 +1,1409 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>Tic-Tac-Toe</title>
+
+  <!-- PWA Meta Tags -->
+  <meta name="description" content="Professional Tic-Tac-Toe web application featuring an unbeatable Minimax AI, real-time multiplayer, sound effects, stats tracking, and offline PWA support." />
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="TicTacToe Pro" />
+
+  <!-- SVG Logo / App Icon (Embedded Data URI) -->
+  <link id="app-icon" rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' width='512' height='512'><rect width='512' height='512' rx='128' fill='%230f172a'/><rect x='32' y='32' width='448' height='448' rx='96' fill='%231e293b' stroke='%23334155' stroke-width='8'/><path d='M180 80V432 M332 80V432 M80 180H432 M80 332H432' stroke='%23475569' stroke-width='24' stroke-linecap='round'/><path d='M100 100 L160 160 M160 100 L100 160' stroke='%233b82f6' stroke-width='24' stroke-linecap='round'/><circle cx='380' cy='130' r='32' stroke='%23ec4899' stroke-width='20' fill='none'/><path d='M350 350 L410 410 M410 350 L350 410' stroke='%233b82f6' stroke-width='24' stroke-linecap='round'/><circle cx='130' cy='380' r='32' stroke='%23ec4899' stroke-width='20' fill='none'/></svg>" />
+  <link rel="apple-touch-icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' width='512' height='512'><rect width='512' height='512' rx='128' fill='%230f172a'/><rect x='32' y='32' width='448' height='448' rx='96' fill='%231e293b' stroke='%23334155' stroke-width='8'/><path d='M180 80V432 M332 80V432 M80 180H432 M80 332H432' stroke='%23475569' stroke-width='24' stroke-linecap='round'/><path d='M100 100 L160 160 M160 100 L100 160' stroke='%233b82f6' stroke-width='24' stroke-linecap='round'/><circle cx='380' cy='130' r='32' stroke='%23ec4899' stroke-width='20' fill='none'/><path d='M350 350 L410 410 M410 350 L350 410' stroke='%233b82f6' stroke-width='24' stroke-linecap='round'/><circle cx='130' cy='380' r='32' stroke='%23ec4899' stroke-width='20' fill='none'/></svg>" />
+
+  <!-- Embedded Web Manifest -->
+  <link rel="manifest" id="manifest-placeholder" />
+
+  <!-- Tailwind CSS & Canvas Confetti -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eff6ff',
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8',
+            },
+            playerX: '#3b82f6', // Electric Blue
+            playerO: '#ec4899', // Vibrant Pink
+          },
+          animation: {
+            'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            'bounce-short': 'bounce 0.6s ease-in-out 1',
+            'scale-in': 'scaleIn 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards',
+          },
+          keyframes: {
+            scaleIn: {
+              '0%': { transform: 'scale(0)', opacity: '0' },
+              '100%': { transform: 'scale(1)', opacity: '1' }
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Glassmorphism custom styling */
+    .glass-card {
+      background: rgba(255, 255, 255, 0.65);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.4);
+    }
+    .dark .glass-card {
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .cell-glow-x {
+      box-shadow: 0 0 25px rgba(59, 130, 246, 0.35);
+    }
+    .cell-glow-o {
+      box-shadow: 0 0 25px rgba(236, 72, 153, 0.35);
+    }
+
+    /* SVG Winning Line Animation */
+    .win-line {
+      stroke-dasharray: 1000;
+      stroke-dashoffset: 1000;
+      animation: dash 0.5s ease-out forwards;
+    }
+
+    @keyframes dash {
+      to {
+        stroke-dashoffset: 0;
+      }
+    }
+
+    /* Prevent text highlight on mobile touch */
+    * {
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100 min-h-screen flex flex-col transition-colors duration-300 font-sans antialiased overflow-x-hidden">
+
+  <!-- Dynamic Background Glow Gradients -->
+  <div class="fixed inset-0 pointer-events-none overflow-hidden z-0">
+    <div class="absolute -top-40 -left-40 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl dark:bg-blue-600/15"></div>
+    <div class="absolute -bottom-40 -right-40 w-96 h-96 bg-pink-500/20 rounded-full blur-3xl dark:bg-pink-600/15"></div>
+  </div>
+
+  <!-- App Wrapper -->
+  <div class="relative z-10 flex-1 flex flex-col max-w-2xl mx-auto w-full px-4 py-4 sm:py-6 justify-between min-h-screen">
+
+    <!-- Header Navigation -->
+    <header class="glass-card rounded-2xl p-3 sm:p-4 mb-4 flex items-center justify-between shadow-lg">
+      <div class="flex items-center gap-3">
+        <!-- SVG Logo Banner -->
+        <div class="relative w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center shadow-md overflow-hidden group">
+          <svg viewBox="0 0 512 512" class="w-8 h-8 transition-transform duration-300 group-hover:scale-110">
+            <path d="M180 80V432 M332 80V432 M80 180H432 M80 332H432" stroke="#475569" stroke-width="28" stroke-linecap="round"/>
+            <path d="M110 110 L160 160 M160 110 L110 160" stroke="#3b82f6" stroke-width="28" stroke-linecap="round"/>
+            <circle cx="370" cy="135" r="28" stroke="#ec4899" stroke-width="24" fill="none"/>
+            <path d="M350 350 L400 400 M400 350 L350 400" stroke="#3b82f6" stroke-width="28" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-lg sm:text-xl font-black tracking-tight bg-gradient-to-r from-blue-500 via-indigo-500 to-pink-500 bg-clip-text text-transparent">
+            TIC-TAC-TOE <span class="text-xs px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-500 font-semibold border border-blue-500/20">PRO</span>
+          </h1>
+          <p class="text-xs text-slate-500 dark:text-slate-400 font-medium">Smart AI & Real-Time Online</p>
+        </div>
+      </div>
+
+      <!-- Quick Controls -->
+      <div class="flex items-center gap-1.5 sm:gap-2">
+        <button id="pwa-install-btn" class="hidden flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-bold shadow-md hover:opacity-90 transition active:scale-95 animate-bounce-short">
+          <i data-lucide="download" class="w-3.5 h-3.5"></i>
+          <span class="hidden xs:inline">Install</span>
+        </button>
+
+        <button id="github-modal-btn" title="GitHub Setup & Download" class="p-2 sm:p-2.5 rounded-xl bg-slate-200/60 dark:bg-slate-800/60 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition active:scale-95 flex items-center gap-1.5">
+          <i data-lucide="github" class="w-4 h-4 sm:w-5 sm:h-5"></i>
+        </button>
+
+        <button id="sound-btn" title="Toggle Audio" class="p-2 sm:p-2.5 rounded-xl bg-slate-200/60 dark:bg-slate-800/60 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition active:scale-95">
+          <i data-lucide="volume-2" id="sound-icon" class="w-4 h-4 sm:w-5 sm:h-5"></i>
+        </button>
+
+        <button id="theme-btn" title="Toggle Theme" class="p-2 sm:p-2.5 rounded-xl bg-slate-200/60 dark:bg-slate-800/60 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition active:scale-95">
+          <i data-lucide="moon" id="theme-icon" class="w-4 h-4 sm:w-5 sm:h-5"></i>
+        </button>
+
+        <button id="reset-stats-btn" title="Reset Statistics" class="p-2 sm:p-2.5 rounded-xl bg-slate-200/60 dark:bg-slate-800/60 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition active:scale-95">
+          <i data-lucide="rotate-ccw" class="w-4 h-4 sm:w-5 sm:h-5"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- Game Settings / Controls Bar -->
+    <div class="glass-card rounded-2xl p-3 mb-4 shadow-md flex flex-col gap-2 text-xs font-semibold">
+      <!-- Mode Selection -->
+      <div class="flex flex-col gap-1">
+        <label class="text-slate-500 dark:text-slate-400 font-medium px-1">Game Mode</label>
+        <div class="grid grid-cols-3 bg-slate-200/70 dark:bg-slate-900/60 p-1 rounded-xl gap-1">
+          <button id="mode-ai" class="py-1.5 rounded-lg text-center transition font-bold bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm">
+            vs AI
+          </button>
+          <button id="mode-pvp" class="py-1.5 rounded-lg text-center transition font-bold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">
+            2 Player
+          </button>
+          <button id="mode-online" class="py-1.5 rounded-lg text-center transition font-bold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white flex items-center justify-center gap-1">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span>Online</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Difficulty Selection (vs AI) -->
+      <div id="difficulty-wrapper" class="flex flex-col gap-1">
+        <label class="text-slate-500 dark:text-slate-400 font-medium px-1">AI Difficulty</label>
+        <select id="difficulty-select" class="w-full bg-slate-200/70 dark:bg-slate-900/60 border-0 rounded-xl px-2.5 py-1.5 font-bold text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 cursor-pointer outline-none">
+          <option value="easy">Easy (Casual)</option>
+          <option value="medium">Medium (Smart)</option>
+          <option value="unbeatable" selected>Unbeatable (Minimax)</option>
+        </select>
+      </div>
+
+      <!-- Online Room Panel (Hidden by default) -->
+      <div id="online-wrapper" class="hidden flex flex-col gap-2 pt-1 border-t border-slate-200 dark:border-slate-800">
+        <!-- Room Actions (Create or Join) -->
+        <div id="online-actions-panel" class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <button id="create-room-btn" class="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold flex items-center justify-center gap-2 shadow-md hover:opacity-95 active:scale-95 transition">
+            <i data-lucide="plus-circle" class="w-4 h-4"></i>
+            <span>Create New Room</span>
+          </button>
+
+          <div class="flex items-center gap-1.5">
+            <input id="room-code-input" type="text" placeholder="ROOM CODE" maxlength="6" class="w-full bg-slate-200/80 dark:bg-slate-900/80 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-1.5 font-mono font-bold text-center text-slate-800 dark:text-white tracking-widest uppercase focus:ring-2 focus:ring-blue-500 outline-none placeholder:font-sans placeholder:tracking-normal placeholder:font-normal placeholder:text-slate-400" />
+            <button id="join-room-btn" class="py-2 px-3 rounded-xl bg-emerald-600 text-white font-bold flex items-center gap-1 shadow-md hover:bg-emerald-500 active:scale-95 transition shrink-0">
+              <i data-lucide="log-in" class="w-4 h-4"></i>
+              <span>Join</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Room Active State Display -->
+        <div id="online-room-card" class="hidden glass-card rounded-xl p-2.5 bg-blue-500/10 border-blue-500/20 flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="text-slate-500 dark:text-slate-400 text-xs font-semibold">Room:</span>
+            <span id="active-room-code" class="font-mono font-black text-sm tracking-widest text-blue-500">------</span>
+            <button id="copy-room-btn" title="Copy Room Code" class="p-1 rounded-md bg-blue-500/10 hover:bg-blue-500/20 text-blue-500 transition">
+              <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+          <div class="flex items-center gap-2 text-xs">
+            <span id="player-role-badge" class="px-2 py-0.5 rounded-full font-bold bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+              Connecting...
+            </span>
+            <button id="leave-room-btn" class="p-1 rounded-md hover:bg-red-500/20 text-red-400 transition" title="Leave Room">
+              <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scoreboard -->
+    <div class="grid grid-cols-3 gap-2.5 mb-4">
+      <!-- Player X -->
+      <div id="score-card-x" class="glass-card rounded-2xl p-3 flex flex-col items-center justify-center border-b-4 border-b-blue-500 shadow-md transition-transform duration-200">
+        <div class="flex items-center gap-1 text-blue-500 font-bold text-xs uppercase tracking-wider mb-0.5">
+          <i data-lucide="x" class="w-4 h-4 stroke-[3]"></i>
+          <span id="label-player-x">Player X</span>
+        </div>
+        <span id="score-x" class="text-2xl sm:text-3xl font-black text-slate-800 dark:text-white">0</span>
+      </div>
+
+      <!-- Ties -->
+      <div class="glass-card rounded-2xl p-3 flex flex-col items-center justify-center border-b-4 border-b-slate-400 dark:border-b-slate-600 shadow-md">
+        <div class="flex items-center gap-1 text-slate-500 dark:text-slate-400 font-bold text-xs uppercase tracking-wider mb-0.5">
+          <i data-lucide="minus" class="w-4 h-4 stroke-[3]"></i>
+          <span>Ties</span>
+        </div>
+        <span id="score-ties" class="text-2xl sm:text-3xl font-black text-slate-800 dark:text-white">0</span>
+      </div>
+
+      <!-- Player O -->
+      <div id="score-card-o" class="glass-card rounded-2xl p-3 flex flex-col items-center justify-center border-b-4 border-b-pink-500 shadow-md transition-transform duration-200">
+        <div class="flex items-center gap-1 text-pink-500 font-bold text-xs uppercase tracking-wider mb-0.5">
+          <i data-lucide="circle" class="w-3.5 h-3.5 stroke-[3]"></i>
+          <span id="label-player-o">AI (O)</span>
+        </div>
+        <span id="score-o" class="text-2xl sm:text-3xl font-black text-slate-800 dark:text-white">0</span>
+      </div>
+    </div>
+
+    <!-- Status Display -->
+    <div class="text-center mb-4 min-h-[32px] flex items-center justify-center">
+      <div id="status-badge" class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs sm:text-sm font-bold shadow-sm transition-all duration-300 bg-slate-200/80 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300">
+        <span id="status-indicator" class="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse"></span>
+        <span id="status-text">Player X's Turn</span>
+      </div>
+    </div>
+
+    <!-- Main Game Board Container -->
+    <div class="relative w-full max-w-[360px] sm:max-w-[420px] aspect-square mx-auto mb-4">
+      <div class="glass-card w-full h-full rounded-3xl p-3 sm:p-4 shadow-2xl relative grid grid-cols-3 gap-2.5 sm:gap-3 bg-slate-200/40 dark:bg-slate-900/40">
+
+        <!-- SVG Winning Line Layer -->
+        <svg id="winning-line-svg" class="absolute inset-0 w-full h-full pointer-events-none z-20" viewBox="0 0 300 300">
+          <line id="winning-line" x1="0" y1="0" x2="0" y2="0" stroke="currentColor" stroke-width="12" stroke-linecap="round" class="hidden" />
+        </svg>
+
+        <!-- 9 Interactive Cells -->
+        <!-- Row 0 -->
+        <button data-cell="0" class="game-cell rounded-2xl bg-white/80 dark:bg-slate-800/80 hover:bg-white dark:hover:bg-slate-700/80 transition-all duration-200 flex items-center justify-center shadow-sm hover:shadow-md active:scale-95 text-slate-800 dark:text-white"></button>
+        <button data-cell="1" class="game-cell rounded-2xl bg-white/80 dark:bg-slate-800/80 hover:bg-white dark:hover:bg-slate-700/80 transition-all duration-200 flex items-center justify-center shadow-sm hover:shadow-md active:scale-95 text-slate-800 dark:text-white"></button>
+        <button data-cell="2" class="game-cell rounded-2xl bg-white/80 dark:bg-slate-800/80 hover:bg-white dark:hover:bg-slate-700/80 transition-all duration-200 flex items-center justify-center shadow-sm hover:shadow-md active:scale-95 text-slate-800 dark:text-white"></button>
+        <!-- Row 1 -->
+        <button data-cell="3" class="game-cell rounded-2xl bg-white/80 dark:bg-slate-800/80 hover:bg-white dark:hover:bg-slate-700/80 transition-all duration-200 flex items-center justify-center shadow-sm hover:shadow-md active:scale-95 text-slate-800 dark:text-white"></button>
+        <button data-cell="4" class="game-cell rounded-2xl bg-white/80 dark:bg-slate-800/80 hover:bg-white dark:hover:bg-slate-700/80 transition-all duration-200 flex items-center justify-center shadow-sm hover:shadow-md active:scale-95 text-slate-800 dark:text-white"></button>
+        <button data-cell="5" class="game-cell rounded-2xl bg-white/80 dark:bg-slate-800/80 hover:bg-white dark:hover:bg-slate-700/80 transition-all duration-200 flex items-center justify-center shadow-sm hover:shadow-md active:scale-95 text-slate-800 dark:text-white"></button>
+        <!-- Row 2 -->
+        <button data-cell="6" class="game-cell rounded-2xl bg-white/80 dark:bg-slate-800/80 hover:bg-white dark:hover:bg-slate-700/80 transition-all duration-200 flex items-center justify-center shadow-sm hover:shadow-md active:scale-95 text-slate-800 dark:text-white"></button>
+        <button data-cell="7" class="game-cell rounded-2xl bg-white/80 dark:bg-slate-800/80 hover:bg-white dark:hover:bg-slate-700/80 transition-all duration-200 flex items-center justify-center shadow-sm hover:shadow-md active:scale-95 text-slate-800 dark:text-white"></button>
+        <button data-cell="8" class="game-cell rounded-2xl bg-white/80 dark:bg-slate-800/80 hover:bg-white dark:hover:bg-slate-700/80 transition-all duration-200 flex items-center justify-center shadow-sm hover:shadow-md active:scale-95 text-slate-800 dark:text-white"></button>
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="flex items-center gap-3 justify-center mb-2">
+      <button id="undo-btn" class="flex-1 max-w-[140px] py-3 px-4 rounded-xl glass-card text-xs sm:text-sm font-bold flex items-center justify-center gap-2 hover:bg-slate-200/80 dark:hover:bg-slate-800/80 transition active:scale-95 disabled:opacity-40 disabled:pointer-events-none">
+        <i data-lucide="undo-2" class="w-4 h-4"></i>
+        <span>Undo</span>
+      </button>
+
+      <button id="restart-btn" class="flex-1 max-w-[200px] py-3 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-lg hover:shadow-blue-500/25 hover:opacity-95 transition active:scale-95">
+        <i data-lucide="play" class="w-4 h-4 fill-current"></i>
+        <span id="restart-btn-text">New Match</span>
+      </button>
+    </div>
+
+    <!-- Footer PWA Offline Status -->
+    <footer class="text-center py-2 text-[11px] text-slate-400 dark:text-slate-500 font-medium flex items-center justify-center gap-1.5">
+      <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+      <span>PWA &amp; Online Multiplayer Supported</span>
+    </footer>
+  </div>
+
+  <!-- GITHUB PWA MODAL -->
+  <div id="github-modal" class="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+    <div class="glass-card w-full max-w-lg rounded-3xl p-5 sm:p-6 shadow-2xl bg-white/90 dark:bg-slate-900/95 border border-slate-200 dark:border-slate-800 relative animate-scale-in max-h-[90vh] overflow-y-auto">
+      <!-- Close Button -->
+      <button id="close-github-modal" class="absolute top-4 right-4 p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+
+      <div class="flex items-center gap-3 mb-4">
+        <div class="p-3 rounded-2xl bg-slate-900 text-white dark:bg-slate-800 border border-slate-700">
+          <i data-lucide="github" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <h2 class="text-lg font-bold text-slate-900 dark:text-white">Host on GitHub & Download PWA</h2>
+          <p class="text-xs text-slate-500 dark:text-slate-400">Deploy as your personal web app in 3 simple steps</p>
+        </div>
+      </div>
+
+      <!-- Instructions List -->
+      <div class="space-y-3 mb-6 text-xs text-slate-600 dark:text-slate-300">
+        <div class="p-3 rounded-xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800 flex items-start gap-3">
+          <span class="w-5 h-5 rounded-full bg-blue-500 text-white font-bold flex items-center justify-center shrink-0">1</span>
+          <div>
+            <strong class="text-slate-900 dark:text-white block mb-0.5">Download Code File</strong>
+            Click the download button below to save <code class="bg-blue-500/10 text-blue-500 px-1 py-0.5 rounded font-mono">index.html</code> containing the complete PWA code & logo.
+          </div>
+        </div>
+
+        <div class="p-3 rounded-xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800 flex items-start gap-3">
+          <span class="w-5 h-5 rounded-full bg-blue-500 text-white font-bold flex items-center justify-center shrink-0">2</span>
+          <div>
+            <strong class="text-slate-900 dark:text-white block mb-0.5">Upload to GitHub Repository</strong>
+            Create a new repository named <code class="bg-blue-500/10 text-blue-500 px-1 py-0.5 rounded font-mono">tictactoe</code> on GitHub and upload the downloaded <code class="bg-blue-500/10 text-blue-500 px-1 py-0.5 rounded font-mono">index.html</code> file.
+          </div>
+        </div>
+
+        <div class="p-3 rounded-xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800 flex items-start gap-3">
+          <span class="w-5 h-5 rounded-full bg-blue-500 text-white font-bold flex items-center justify-center shrink-0">3</span>
+          <div>
+            <strong class="text-slate-900 dark:text-white block mb-0.5">Enable GitHub Pages & Install</strong>
+            Go to <strong>Settings &gt; Pages</strong> in your GitHub repo, select the main branch, and save. Visit your live site URL on mobile or desktop to install it to your home screen!
+          </div>
+        </div>
+      </div>
+
+      <!-- Action Buttons in Modal -->
+      <div class="flex flex-col sm:flex-row items-center gap-2">
+        <button id="download-code-btn" class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-lg hover:opacity-95 transition active:scale-95">
+          <i data-lucide="download" class="w-4 h-4"></i>
+          <span>Download index.html File</span>
+        </button>
+
+        <a href="https://github.com/new" target="_blank" rel="noopener noreferrer" class="w-full py-3 px-4 rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs font-bold flex items-center justify-center gap-2 hover:bg-slate-300 dark:hover:bg-slate-700 transition active:scale-95">
+          <i data-lucide="external-link" class="w-4 h-4"></i>
+          <span>Open GitHub New Repo</span>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notification Toast Container -->
+  <div id="toast-message" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 pointer-events-none transition-all duration-300 opacity-0 translate-y-4">
+    <div class="px-4 py-2 rounded-xl bg-slate-900/90 text-white text-xs font-bold shadow-2xl backdrop-blur-md border border-slate-700 flex items-center gap-2">
+      <i data-lucide="info" class="w-4 h-4 text-blue-400"></i>
+      <span id="toast-text">Notification message</span>
+    </div>
+  </div>
+
+  <!-- Firebase JS Modules -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    // Global variables provided by environment
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'tictactoe-pro-default';
+    const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+      apiKey: "demo-api-key",
+      authDomain: "demo-project.firebaseapp.com",
+      projectId: "demo-project",
+      storageBucket: "demo-project.appspot.com",
+      messagingSenderId: "123456789",
+      appId: "1:123456789:web:abcdef"
+    };
+
+    let app, auth, db;
+    let currentUser = null;
+    let currentRoomId = null;
+    let roomUnsubscribe = null;
+    let myOnlineSymbol = null; // 'X' or 'O'
+
+    // Initialize Firebase Services
+    try {
+      app = initializeApp(firebaseConfig);
+      auth = getAuth(app);
+      db = getFirestore(app);
+
+      // Authenticate
+      async function authenticate() {
+        try {
+          if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+            const userCred = await signInWithCustomToken(auth, __initial_auth_token);
+            currentUser = userCred.user;
+          } else {
+            const userCred = await signInAnonymously(auth);
+            currentUser = userCred.user;
+          }
+        } catch (err) {
+          console.warn("Auth initialization fallback:", err);
+        }
+      }
+      authenticate();
+    } catch (e) {
+      console.warn("Firebase config fallback mode active:", e);
+    }
+
+    // Toast Notification helper
+    function showToast(msg) {
+      const toast = document.getElementById('toast-message');
+      const toastText = document.getElementById('toast-text');
+      toastText.innerText = msg;
+      toast.classList.remove('opacity-0', 'translate-y-4');
+      toast.classList.add('opacity-100', 'translate-y-0');
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-4');
+        toast.classList.remove('opacity-100', 'translate-y-0');
+      }, 3000);
+    }
+
+    // Generate Room Code (6 Uppercase AlphaNumeric)
+    function generateRoomCode() {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      let result = '';
+      for (let i = 0; i < 6; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      return result;
+    }
+
+    // Expose Online Sync Functions to Window scope
+    window.onlineEngine = {
+      isOnlineMode: false,
+      mySymbol: null,
+      roomId: null,
+
+      async createRoom() {
+        if (!currentUser) {
+          showToast("Authenticating online session... please try again in a moment.");
+          return;
+        }
+
+        const code = generateRoomCode();
+        const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', code);
+
+        const initialRoomState = {
+          hostId: currentUser.uid,
+          guestId: null,
+          board: Array(9).fill(null),
+          currentPlayer: 'X',
+          isGameActive: true,
+          winner: null,
+          winComboIndex: null,
+          winningCombo: null,
+          rematchRequestedBy: null,
+          updatedAt: Date.now()
+        };
+
+        try {
+          await setDoc(roomRef, initialRoomState);
+          this.joinRoomByCode(code, true);
+          showToast(`Room created! Code: ${code}`);
+        } catch (err) {
+          console.error("Error creating room:", err);
+          showToast("Failed to create online room.");
+        }
+      },
+
+      async joinRoomByCode(code, isHost = false) {
+        if (!currentUser) {
+          showToast("Authenticating... please try again.");
+          return;
+        }
+
+        const cleanCode = code.trim().toUpperCase();
+        if (cleanCode.length < 4) {
+          showToast("Please enter a valid Room Code");
+          return;
+        }
+
+        const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', cleanCode);
+
+        try {
+          const snapshot = await getDoc(roomRef);
+          if (!snapshot.exists()) {
+            showToast("Room not found! Check code and try again.");
+            return;
+          }
+
+          const roomData = snapshot.data();
+
+          if (!isHost && roomData.hostId !== currentUser.uid && !roomData.guestId) {
+            // Join as Guest (Player O)
+            await updateDoc(roomRef, {
+              guestId: currentUser.uid,
+              updatedAt: Date.now()
+            });
+          }
+
+          // Unsubscribe previous room listener if active
+          if (roomUnsubscribe) roomUnsubscribe();
+
+          currentRoomId = cleanCode;
+          this.roomId = cleanCode;
+          this.isOnlineMode = true;
+
+          // Update Room UI Elements
+          document.getElementById('online-room-card').classList.remove('hidden');
+          document.getElementById('active-room-code').innerText = cleanCode;
+
+          // Listen to Real-Time Updates
+          roomUnsubscribe = onSnapshot(roomRef, (docSnap) => {
+            if (!docSnap.exists()) {
+              showToast("Room was closed by host.");
+              this.leaveRoom();
+              return;
+            }
+            const data = docSnap.data();
+            this.handleRoomUpdate(data);
+          }, (error) => {
+            console.error("Room snapshot error:", error);
+          });
+
+        } catch (err) {
+          console.error("Error joining room:", err);
+          showToast("Could not join room.");
+        }
+      },
+
+      handleRoomUpdate(data) {
+        // Determine role
+        if (data.hostId === currentUser.uid) {
+          this.mySymbol = 'X';
+          myOnlineSymbol = 'X';
+          document.getElementById('player-role-badge').innerText = "YOU: Player X (Host)";
+          document.getElementById('player-role-badge').className = "px-2 py-0.5 rounded-full font-bold bg-blue-500/20 text-blue-500";
+        } else {
+          this.mySymbol = 'O';
+          myOnlineSymbol = 'O';
+          document.getElementById('player-role-badge').innerText = "YOU: Player O (Guest)";
+          document.getElementById('player-role-badge').className = "px-2 py-0.5 rounded-full font-bold bg-pink-500/20 text-pink-500";
+        }
+
+        // Check if waiting for Guest
+        if (!data.guestId) {
+          window.updateOnlineStatusUI("Waiting for Opponent to join...", "bg-amber-500");
+        } else {
+          // Sync Game state to window game engine
+          window.syncOnlineBoardState(data);
+        }
+      },
+
+      async makeMove(index) {
+        if (!this.roomId || !currentUser) return;
+        const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', this.roomId);
+
+        try {
+          const snap = await getDoc(roomRef);
+          if (!snap.exists()) return;
+          const data = snap.data();
+
+          if (!data.guestId) {
+            showToast("Waiting for opponent to join room!");
+            return;
+          }
+
+          if (data.currentPlayer !== this.mySymbol || !data.isGameActive || data.board[index] !== null) {
+            return;
+          }
+
+          const newBoard = [...data.board];
+          newBoard[index] = this.mySymbol;
+
+          const winInfo = window.checkWinLogic(newBoard);
+          let isGameActive = true;
+          let winner = null;
+          let winComboIndex = null;
+          let winningCombo = null;
+
+          if (winInfo) {
+            isGameActive = false;
+            winner = winInfo.winner;
+            winComboIndex = winInfo.comboIndex;
+            winningCombo = winInfo.combo;
+          } else if (newBoard.every(cell => cell !== null)) {
+            isGameActive = false;
+            winner = 'tie';
+          }
+
+          await updateDoc(roomRef, {
+            board: newBoard,
+            currentPlayer: this.mySymbol === 'X' ? 'O' : 'X',
+            isGameActive,
+            winner,
+            winComboIndex,
+            winningCombo,
+            rematchRequestedBy: null,
+            updatedAt: Date.now()
+          });
+
+        } catch (err) {
+          console.error("Online move failed:", err);
+        }
+      },
+
+      async requestRematch() {
+        if (!this.roomId) return;
+        const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', this.roomId);
+        try {
+          await updateDoc(roomRef, {
+            board: Array(9).fill(null),
+            currentPlayer: 'X',
+            isGameActive: true,
+            winner: null,
+            winComboIndex: null,
+            winningCombo: null,
+            rematchRequestedBy: currentUser.uid,
+            updatedAt: Date.now()
+          });
+          showToast("Match restarted!");
+        } catch (err) {
+          console.error("Rematch request failed:", err);
+        }
+      },
+
+      leaveRoom() {
+        if (roomUnsubscribe) roomUnsubscribe();
+        this.isOnlineMode = false;
+        this.roomId = null;
+        this.mySymbol = null;
+        myOnlineSymbol = null;
+        document.getElementById('online-room-card').classList.add('hidden');
+        document.getElementById('room-code-input').value = '';
+        window.initGame();
+        showToast("Left online room.");
+      }
+    };
+  </script>
+
+  <!-- JavaScript App Logic -->
+  <script>
+    // --- PWA MANIFEST & SERVICE WORKER SETUP ---
+    function setupPWA() {
+      // 1. Create Data URI Manifest dynamically
+      const manifestData = {
+        name: "Tic-Tac-Toe Pro",
+        short_name: "TicTacToe",
+        description: "Professional Tic-Tac-Toe Game with AI and Real-Time Online Support",
+        start_url: "./",
+        display: "standalone",
+        background_color: "#0f172a",
+        theme_color: "#0f172a",
+        icons: [
+          {
+            src: document.getElementById('app-icon').href,
+            sizes: "512x512",
+            type: "image/svg+xml",
+            purpose: "any maskable"
+          }
+        ]
+      };
+      const manifestStr = JSON.stringify(manifestData);
+      const manifestBlob = new Blob([manifestStr], { type: 'application/json' });
+      const manifestURL = URL.createObjectURL(manifestBlob);
+      document.getElementById('manifest-placeholder').setAttribute('href', manifestURL);
+
+      // 2. Register Service Worker
+      if ('serviceWorker' in navigator) {
+        const swCode = `
+          const CACHE_NAME = 'tictactoe-pro-v2';
+          self.addEventListener('install', (e) => {
+            self.skipWaiting();
+          });
+          self.addEventListener('activate', (e) => {
+            e.waitUntil(clients.claim());
+          });
+          self.addEventListener('fetch', (e) => {
+            e.respondWith(
+              caches.match(e.request).then((res) => res || fetch(e.request).catch(() => new Response("Offline")))
+            );
+          });
+        `;
+        const swBlob = new Blob([swCode], { type: 'text/javascript' });
+        const swURL = URL.createObjectURL(swBlob);
+        navigator.serviceWorker.register(swURL).catch(() => {});
+      }
+    }
+
+    setupPWA();
+
+    // --- GAME ENGINE & STATE persistence ---
+    const WINNING_COMBOS = [
+      [0, 1, 2], [3, 4, 5], [6, 7, 8], // Rows
+      [0, 3, 6], [1, 4, 7], [2, 5, 8], // Columns
+      [0, 4, 8], [2, 4, 6]             // Diagonals
+    ];
+
+    // Web Audio Synthesizer for FX
+    class AudioFX {
+      constructor() {
+        this.ctx = null;
+        this.enabled = true;
+      }
+
+      init() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (AudioContext) this.ctx = new AudioContext();
+        }
+      }
+
+      playTone(freq, type, duration, gainVal = 0.1) {
+        if (!this.enabled) return;
+        this.init();
+        if (!this.ctx) return;
+
+        try {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = type;
+          osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+          gain.gain.setValueAtTime(gainVal, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + duration);
+
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start();
+          osc.stop(this.ctx.currentTime + duration);
+        } catch (e) {}
+      }
+
+      playX() {
+        this.playTone(520, 'sine', 0.15, 0.15);
+      }
+
+      playO() {
+        this.playTone(330, 'triangle', 0.2, 0.2);
+      }
+
+      playWin() {
+        if (!this.enabled) return;
+        [440, 554.37, 659.25, 880].forEach((freq, idx) => {
+          setTimeout(() => this.playTone(freq, 'sine', 0.25, 0.15), idx * 90);
+        });
+      }
+
+      playTie() {
+        if (!this.enabled) return;
+        [300, 260, 220].forEach((freq, idx) => {
+          setTimeout(() => this.playTone(freq, 'sawtooth', 0.2, 0.08), idx * 80);
+        });
+      }
+    }
+
+    const soundEngine = new AudioFX();
+
+    // App State Variables
+    let board = Array(9).fill(null);
+    let currentPlayer = 'X';
+    let isGameActive = true;
+    let gameMode = 'ai'; // 'ai', 'pvp', 'online'
+    let difficulty = 'unbeatable'; // 'easy', 'medium', 'unbeatable'
+    let history = []; // Stack for undo functionality
+    let deferredInstallPrompt = null;
+
+    let stats = {
+      x: 0,
+      o: 0,
+      ties: 0
+    };
+
+    // DOM Elements
+    const cells = document.querySelectorAll('.game-cell');
+    const statusText = document.getElementById('status-text');
+    const statusIndicator = document.getElementById('status-indicator');
+    const scoreXEl = document.getElementById('score-x');
+    const scoreOEl = document.getElementById('score-o');
+    const scoreTiesEl = document.getElementById('score-ties');
+    const labelPlayerX = document.getElementById('label-player-x');
+    const labelPlayerO = document.getElementById('label-player-o');
+    const modeAiBtn = document.getElementById('mode-ai');
+    const modePvpBtn = document.getElementById('mode-pvp');
+    const modeOnlineBtn = document.getElementById('mode-online');
+    const difficultyWrapper = document.getElementById('difficulty-wrapper');
+    const difficultySelect = document.getElementById('difficulty-select');
+    const onlineWrapper = document.getElementById('online-wrapper');
+    const restartBtn = document.getElementById('restart-btn');
+    const restartBtnText = document.getElementById('restart-btn-text');
+    const undoBtn = document.getElementById('undo-btn');
+    const themeBtn = document.getElementById('theme-btn');
+    const soundBtn = document.getElementById('sound-btn');
+    const resetStatsBtn = document.getElementById('reset-stats-btn');
+    const pwaInstallBtn = document.getElementById('pwa-install-btn');
+    const githubModalBtn = document.getElementById('github-modal-btn');
+    const githubModal = document.getElementById('github-modal');
+    const closeGithubModal = document.getElementById('close-github-modal');
+    const downloadCodeBtn = document.getElementById('download-code-btn');
+    const winningLine = document.getElementById('winning-line');
+    const scoreCardX = document.getElementById('score-card-x');
+    const scoreCardO = document.getElementById('score-card-o');
+
+    // Online UI Elements
+    const createRoomBtn = document.getElementById('create-room-btn');
+    const joinRoomBtn = document.getElementById('join-room-btn');
+    const roomCodeInput = document.getElementById('room-code-input');
+    const copyRoomBtn = document.getElementById('copy-room-btn');
+    const leaveRoomBtn = document.getElementById('leave-room-btn');
+
+    // Load LocalStorage Data
+    function loadSavedState() {
+      const savedStats = localStorage.getItem('ttt_pro_stats');
+      if (savedStats) {
+        try { stats = JSON.parse(savedStats); } catch(e){}
+      }
+      const savedTheme = localStorage.getItem('ttt_pro_theme');
+      if (savedTheme === 'light') {
+        document.documentElement.classList.remove('dark');
+      } else {
+        document.documentElement.classList.add('dark');
+      }
+      const savedSound = localStorage.getItem('ttt_pro_sound');
+      if (savedSound === 'false') {
+        soundEngine.enabled = false;
+      }
+      updateThemeIcon();
+      updateSoundIcon();
+      updateScoreboardUI();
+    }
+
+    function saveStats() {
+      localStorage.setItem('ttt_pro_stats', JSON.stringify(stats));
+    }
+
+    // SVG Icons inside Game Cells
+    function getXSVG() {
+      return `<svg class="w-12 h-12 sm:w-16 sm:h-16 text-playerX animate-scale-in" viewBox="0 0 100 100">
+        <path d="M 20 20 L 80 80 M 80 20 L 20 80" stroke="currentColor" stroke-width="16" stroke-linecap="round"/>
+      </svg>`;
+    }
+
+    function getOSVG() {
+      return `<svg class="w-12 h-12 sm:w-16 sm:h-16 text-playerO animate-scale-in" viewBox="0 0 100 100">
+        <circle cx="50" cy="50" r="32" stroke="currentColor" stroke-width="16" fill="none" stroke-linecap="round"/>
+      </svg>`;
+    }
+
+    // Initialize Game Board
+    function initGame() {
+      board = Array(9).fill(null);
+      currentPlayer = 'X';
+      isGameActive = true;
+      history = [];
+      hideWinningLine();
+      cells.forEach(cell => {
+        cell.innerHTML = '';
+        cell.classList.remove('cell-glow-x', 'cell-glow-o', 'opacity-50', 'opacity-60');
+      });
+
+      if (gameMode === 'online') {
+        undoBtn.classList.add('hidden');
+        restartBtnText.innerText = "Rematch";
+      } else {
+        undoBtn.classList.remove('hidden');
+        restartBtnText.innerText = "New Match";
+      }
+
+      updateTurnStatusUI();
+      updateUndoButton();
+    }
+
+    // Update Turn Indicator
+    function updateTurnStatusUI() {
+      if (!isGameActive) return;
+
+      if (gameMode === 'online' && window.onlineEngine && window.onlineEngine.roomId) {
+        const mySym = window.onlineEngine.mySymbol;
+        if (currentPlayer === mySym) {
+          updateOnlineStatusUI("YOUR TURN!", "bg-emerald-500");
+        } else {
+          updateOnlineStatusUI("Opponent's Turn...", "bg-amber-500");
+        }
+        return;
+      }
+
+      if (currentPlayer === 'X') {
+        statusText.innerText = "Player X's Turn";
+        statusIndicator.className = "w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse";
+        scoreCardX.classList.add('scale-105', 'shadow-blue-500/20');
+        scoreCardO.classList.remove('scale-105', 'shadow-pink-500/20');
+      } else {
+        statusText.innerText = gameMode === 'ai' ? "AI is Thinking..." : "Player O's Turn";
+        statusIndicator.className = "w-2.5 h-2.5 rounded-full bg-pink-500 animate-pulse";
+        scoreCardO.classList.add('scale-105', 'shadow-pink-500/20');
+        scoreCardX.classList.remove('scale-105', 'shadow-blue-500/20');
+      }
+    }
+
+    window.updateOnlineStatusUI = function(text, colorClass) {
+      statusText.innerText = text;
+      statusIndicator.className = `w-2.5 h-2.5 rounded-full ${colorClass} animate-pulse`;
+    }
+
+    // Handle Cell Tap/Click
+    function handleCellClick(index) {
+      if (!isGameActive || board[index] !== null) return;
+
+      if (gameMode === 'online') {
+        if (window.onlineEngine) {
+          window.onlineEngine.makeMove(index);
+        }
+        return;
+      }
+
+      if (gameMode === 'ai' && currentPlayer === 'O') return; // Prevent clicking during AI turn
+
+      makeMove(index, currentPlayer);
+
+      // Check if AI turn is next
+      if (isGameActive && gameMode === 'ai' && currentPlayer === 'O') {
+        updateTurnStatusUI();
+        const delay = Math.floor(Math.random() * 200) + 300;
+        setTimeout(() => {
+          if (!isGameActive) return;
+          const aiMove = getAIMove();
+          if (aiMove !== null && aiMove !== undefined) {
+            makeMove(aiMove, 'O');
+          }
+        }, delay);
+      }
+    }
+
+    // Make a Move
+    function makeMove(index, player) {
+      history.push([...board]);
+      updateUndoButton();
+
+      board[index] = player;
+      const cell = cells[index];
+      cell.innerHTML = player === 'X' ? getXSVG() : getOSVG();
+
+      if (player === 'X') soundEngine.playX();
+      else soundEngine.playO();
+
+      const winInfo = checkWin(board);
+
+      if (winInfo) {
+        handleWin(winInfo);
+      } else if (board.every(cell => cell !== null)) {
+        handleTie();
+      } else {
+        currentPlayer = player === 'X' ? 'O' : 'X';
+        updateTurnStatusUI();
+      }
+    }
+
+    // Real-time Online Sync Handler
+    window.syncOnlineBoardState = function(data) {
+      const prevBoard = [...board];
+      board = data.board;
+      currentPlayer = data.currentPlayer;
+      isGameActive = data.isGameActive;
+
+      // Update cells visually
+      cells.forEach((cell, idx) => {
+        const val = board[idx];
+        if (val !== prevBoard[idx]) {
+          if (val === 'X') {
+            cell.innerHTML = getXSVG();
+            soundEngine.playX();
+          } else if (val === 'O') {
+            cell.innerHTML = getOSVG();
+            soundEngine.playO();
+          } else {
+            cell.innerHTML = '';
+          }
+        }
+      });
+
+      if (data.winner) {
+        if (data.winner === 'tie') {
+          handleTie();
+        } else {
+          handleWin({ winner: data.winner, comboIndex: data.winComboIndex, combo: data.winningCombo });
+        }
+      } else if (isGameActive) {
+        hideWinningLine();
+        cells.forEach(cell => cell.classList.remove('cell-glow-x', 'cell-glow-o', 'opacity-50', 'opacity-60'));
+        updateTurnStatusUI();
+      }
+    }
+
+    // Undo Last Move (Offline Modes)
+    function handleUndo() {
+      if (!isGameActive || history.length === 0 || gameMode === 'online') return;
+
+      if (gameMode === 'ai') {
+        if (history.length >= 2) {
+          board = history.pop();
+          board = history.pop();
+        } else if (history.length === 1) {
+          board = history.pop();
+        }
+        currentPlayer = 'X';
+      } else {
+        board = history.pop();
+        currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+      }
+
+      cells.forEach((cell, idx) => {
+        const val = board[idx];
+        if (val === 'X') cell.innerHTML = getXSVG();
+        else if (val === 'O') cell.innerHTML = getOSVG();
+        else cell.innerHTML = '';
+      });
+
+      updateTurnStatusUI();
+      updateUndoButton();
+    }
+
+    function updateUndoButton() {
+      undoBtn.disabled = history.length === 0 || !isGameActive || gameMode === 'online';
+    }
+
+    // Win Check Logic
+    function checkWin(currentBoard) {
+      for (let i = 0; i < WINNING_COMBOS.length; i++) {
+        const [a, b, c] = WINNING_COMBOS[i];
+        if (currentBoard[a] && currentBoard[a] === currentBoard[b] && currentBoard[a] === currentBoard[c]) {
+          return { winner: currentBoard[a], combo: [a, b, c], comboIndex: i };
+        }
+      }
+      return null;
+    }
+    window.checkWinLogic = checkWin;
+
+    // Handle Victory
+    function handleWin(winInfo) {
+      isGameActive = false;
+      const winner = winInfo.winner;
+      stats[winner.toLowerCase()]++;
+      saveStats();
+      updateScoreboardUI();
+      soundEngine.playWin();
+
+      if (winInfo.comboIndex !== null && winInfo.comboIndex !== undefined) {
+        drawWinningLine(winInfo.comboIndex, winner);
+      }
+
+      if (winInfo.combo) {
+        winInfo.combo.forEach(idx => {
+          cells[idx].classList.add(winner === 'X' ? 'cell-glow-x' : 'cell-glow-o');
+        });
+      }
+
+      cells.forEach((cell, idx) => {
+        if (!winInfo.combo || !winInfo.combo.includes(idx)) {
+          cell.classList.add('opacity-50');
+        }
+      });
+
+      if (gameMode === 'online') {
+        const mySym = window.onlineEngine.mySymbol;
+        statusText.innerText = winner === mySym ? 'YOU WIN! 🎉' : 'OPPONENT WINS!';
+      } else {
+        statusText.innerText = winner === 'X' ? 'Player X Wins!' : (gameMode === 'ai' ? 'AI Wins!' : 'Player O Wins!');
+      }
+
+      statusIndicator.className = `w-2.5 h-2.5 rounded-full ${winner === 'X' ? 'bg-blue-500' : 'bg-pink-500'}`;
+
+      if (typeof confetti === 'function') {
+        confetti({
+          particleCount: 80,
+          spread: 70,
+          origin: { y: 0.6 },
+          colors: winner === 'X' ? ['#3b82f6', '#60a5fa'] : ['#ec4899', '#f472b6']
+        });
+      }
+
+      updateUndoButton();
+    }
+
+    // Handle Draw Game
+    function handleTie() {
+      isGameActive = false;
+      stats.ties++;
+      saveStats();
+      updateScoreboardUI();
+      soundEngine.playTie();
+
+      statusText.innerText = "It's a Draw!";
+      statusIndicator.className = "w-2.5 h-2.5 rounded-full bg-slate-400";
+
+      cells.forEach(cell => cell.classList.add('opacity-60'));
+      updateUndoButton();
+    }
+
+    // SVG Line Coordinates Calculation
+    function drawWinningLine(comboIndex, winner) {
+      const coords = [
+        { x1: 20, y1: 50, x2: 280, y2: 50 },
+        { x1: 20, y1: 150, x2: 280, y2: 150 },
+        { x1: 20, y1: 250, x2: 280, y2: 250 },
+        { x1: 50, y1: 20, x2: 50, y2: 280 },
+        { x1: 150, y1: 20, x2: 150, y2: 280 },
+        { x1: 250, y1: 20, x2: 250, y2: 280 },
+        { x1: 30, y1: 30, x2: 270, y2: 270 },
+        { x1: 270, y1: 30, x2: 30, y2: 270 }
+      ];
+
+      const line = coords[comboIndex];
+      winningLine.setAttribute('x1', line.x1);
+      winningLine.setAttribute('y1', line.y1);
+      winningLine.setAttribute('x2', line.x2);
+      winningLine.setAttribute('y2', line.y2);
+      winningLine.setAttribute('stroke', winner === 'X' ? '#3b82f6' : '#ec4899');
+      winningLine.classList.remove('hidden');
+      winningLine.classList.add('win-line');
+    }
+
+    function hideWinningLine() {
+      winningLine.classList.add('hidden');
+      winningLine.classList.remove('win-line');
+    }
+
+    // --- AI ALGORITHMS (Minimax Unbeatable Engine) ---
+    function getAIMove() {
+      const emptyIndices = board.map((val, idx) => val === null ? idx : null).filter(val => val !== null);
+      if (emptyIndices.length === 0) return null;
+
+      if (difficulty === 'easy') {
+        return emptyIndices[Math.floor(Math.random() * emptyIndices.length)];
+      }
+
+      if (difficulty === 'medium') {
+        if (Math.random() < 0.4) {
+          return emptyIndices[Math.floor(Math.random() * emptyIndices.length)];
+        }
+      }
+
+      let bestScore = -Infinity;
+      let move = null;
+
+      for (let i = 0; i < 9; i++) {
+        if (board[i] === null) {
+          board[i] = 'O';
+          let score = minimax(board, 0, false, -Infinity, Infinity);
+          board[i] = null;
+          if (score > bestScore) {
+            bestScore = score;
+            move = i;
+          }
+        }
+      }
+      return move;
+    }
+
+    function minimax(tempBoard, depth, isMaximizing, alpha, beta) {
+      const winInfo = checkWin(tempBoard);
+      if (winInfo) {
+        return winInfo.winner === 'O' ? (10 - depth) : (depth - 10);
+      }
+      if (tempBoard.every(cell => cell !== null)) {
+        return 0;
+      }
+
+      if (isMaximizing) {
+        let maxEval = -Infinity;
+        for (let i = 0; i < 9; i++) {
+          if (tempBoard[i] === null) {
+            tempBoard[i] = 'O';
+            let evaluation = minimax(tempBoard, depth + 1, false, alpha, beta);
+            tempBoard[i] = null;
+            maxEval = Math.max(maxEval, evaluation);
+            alpha = Math.max(alpha, evaluation);
+            if (beta <= alpha) break;
+          }
+        }
+        return maxEval;
+      } else {
+        let minEval = Infinity;
+        for (let i = 0; i < 9; i++) {
+          if (tempBoard[i] === null) {
+            tempBoard[i] = 'X';
+            let evaluation = minimax(tempBoard, depth + 1, true, alpha, beta);
+            tempBoard[i] = null;
+            minEval = Math.min(minEval, evaluation);
+            beta = Math.min(beta, evaluation);
+            if (beta <= alpha) break;
+          }
+        }
+        return minEval;
+      }
+    }
+
+    // --- UI UPDATES & CONTROLS ---
+    function updateScoreboardUI() {
+      scoreXEl.innerText = stats.x;
+      scoreOEl.innerText = stats.o;
+      scoreTiesEl.innerText = stats.ties;
+    }
+
+    function updateThemeIcon() {
+      const isDark = document.documentElement.classList.contains('dark');
+      themeBtn.innerHTML = isDark
+        ? `<i data-lucide="sun" class="w-4 h-4 sm:w-5 sm:h-5"></i>`
+        : `<i data-lucide="moon" class="w-4 h-4 sm:w-5 sm:h-5"></i>`;
+      lucide.createIcons();
+    }
+
+    function updateSoundIcon() {
+      soundBtn.innerHTML = soundEngine.enabled
+        ? `<i data-lucide="volume-2" class="w-4 h-4 sm:w-5 sm:h-5"></i>`
+        : `<i data-lucide="volume-x" class="w-4 h-4 sm:w-5 sm:h-5 text-red-400"></i>`;
+      lucide.createIcons();
+    }
+
+    function downloadIndexHTML() {
+      const htmlContent = "<!DOCTYPE html>\n" + document.documentElement.outerHTML;
+      const blob = new Blob([htmlContent], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'index.html';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    // EVENT LISTENERS
+    cells.forEach(cell => {
+      cell.addEventListener('click', () => {
+        const index = parseInt(cell.getAttribute('data-cell'));
+        handleCellClick(index);
+      });
+    });
+
+    restartBtn.addEventListener('click', () => {
+      if (gameMode === 'online' && window.onlineEngine && window.onlineEngine.roomId) {
+        window.onlineEngine.requestRematch();
+      } else {
+        initGame();
+      }
+    });
+
+    undoBtn.addEventListener('click', handleUndo);
+
+    // Game Mode Selectors
+    function setActiveModeButton(activeBtn) {
+      [modeAiBtn, modePvpBtn, modeOnlineBtn].forEach(btn => {
+        if (btn === activeBtn) {
+          btn.className = "py-1.5 rounded-lg text-center transition font-bold bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm flex items-center justify-center gap-1";
+        } else {
+          btn.className = "py-1.5 rounded-lg text-center transition font-bold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white flex items-center justify-center gap-1";
+        }
+      });
+    }
+
+    modeAiBtn.addEventListener('click', () => {
+      gameMode = 'ai';
+      setActiveModeButton(modeAiBtn);
+      difficultyWrapper.classList.remove('hidden');
+      onlineWrapper.classList.add('hidden');
+      labelPlayerX.innerText = "Player X";
+      labelPlayerO.innerText = "AI (O)";
+      if (window.onlineEngine && window.onlineEngine.roomId) {
+        window.onlineEngine.leaveRoom();
+      }
+      initGame();
+    });
+
+    modePvpBtn.addEventListener('click', () => {
+      gameMode = 'pvp';
+      setActiveModeButton(modePvpBtn);
+      difficultyWrapper.classList.add('hidden');
+      onlineWrapper.classList.add('hidden');
+      labelPlayerX.innerText = "Player X";
+      labelPlayerO.innerText = "Player O";
+      if (window.onlineEngine && window.onlineEngine.roomId) {
+        window.onlineEngine.leaveRoom();
+      }
+      initGame();
+    });
+
+    modeOnlineBtn.addEventListener('click', () => {
+      gameMode = 'online';
+      setActiveModeButton(modeOnlineBtn);
+      difficultyWrapper.classList.add('hidden');
+      onlineWrapper.classList.remove('hidden');
+      labelPlayerX.innerText = "Player X";
+      labelPlayerO.innerText = "Player O";
+      initGame();
+    });
+
+    // Online Mode Button Handlers
+    createRoomBtn.addEventListener('click', () => {
+      if (window.onlineEngine) window.onlineEngine.createRoom();
+    });
+
+    joinRoomBtn.addEventListener('click', () => {
+      const code = roomCodeInput.value;
+      if (window.onlineEngine) window.onlineEngine.joinRoomByCode(code);
+    });
+
+    copyRoomBtn.addEventListener('click', () => {
+      const code = document.getElementById('active-room-code').innerText;
+      if (code && code !== '------') {
+        const dummy = document.createElement('input');
+        document.body.appendChild(dummy);
+        dummy.value = code;
+        dummy.select();
+        document.execCommand('copy');
+        document.body.removeChild(dummy);
+        
+        const toast = document.getElementById('toast-message');
+        document.getElementById('toast-text').innerText = `Room Code ${code} copied!`;
+        toast.classList.remove('opacity-0', 'translate-y-4');
+        toast.classList.add('opacity-100', 'translate-y-0');
+        setTimeout(() => {
+          toast.classList.add('opacity-0', 'translate-y-4');
+          toast.classList.remove('opacity-100', 'translate-y-0');
+        }, 3000);
+      }
+    });
+
+    leaveRoomBtn.addEventListener('click', () => {
+      if (window.onlineEngine) window.onlineEngine.leaveRoom();
+    });
+
+    difficultySelect.addEventListener('change', (e) => {
+      difficulty = e.target.value;
+      initGame();
+    });
+
+    themeBtn.addEventListener('click', () => {
+      document.documentElement.classList.toggle('dark');
+      const isDark = document.documentElement.classList.contains('dark');
+      localStorage.setItem('ttt_pro_theme', isDark ? 'dark' : 'light');
+      updateThemeIcon();
+    });
+
+    soundBtn.addEventListener('click', () => {
+      soundEngine.enabled = !soundEngine.enabled;
+      localStorage.setItem('ttt_pro_sound', soundEngine.enabled ? 'true' : 'false');
+      updateSoundIcon();
+    });
+
+    resetStatsBtn.addEventListener('click', () => {
+      stats = { x: 0, o: 0, ties: 0 };
+      saveStats();
+      updateScoreboardUI();
+    });
+
+    // GitHub Modal listeners
+    githubModalBtn.addEventListener('click', () => {
+      githubModal.classList.remove('hidden');
+    });
+
+    closeGithubModal.addEventListener('click', () => {
+      githubModal.classList.add('hidden');
+    });
+
+    downloadCodeBtn.addEventListener('click', downloadIndexHTML);
+
+    // PWA Install Event Handling
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredInstallPrompt = e;
+      pwaInstallBtn.classList.remove('hidden');
+    });
+
+    pwaInstallBtn.addEventListener('click', async () => {
+      if (deferredInstallPrompt) {
+        deferredInstallPrompt.prompt();
+        const { outcome } = await deferredInstallPrompt.userChoice;
+        if (outcome === 'accepted') {
+          pwaInstallBtn.classList.add('hidden');
+        }
+        deferredInstallPrompt = null;
+      }
+    });
+
+    // Startup Initialization
+    window.onload = () => {
+      lucide.createIcons();
+      loadSavedState();
+      initGame();
+    };
+  </script>
+</body>
+</html>
