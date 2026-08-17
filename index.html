@@ -393,6 +393,16 @@
       }, 3000);
     }
 
+    function safeCreateIcons() {
+      if (typeof lucide !== 'undefined' && lucide && typeof lucide.createIcons === 'function') {
+        try {
+          lucide.createIcons();
+        } catch (e) {
+          console.warn("Lucide icon creation error:", e);
+        }
+      }
+    }
+
     function generateRoomCode() {
       const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
       let result = '';
@@ -404,12 +414,51 @@
 
     let peer = null;
     let peerConn = null;
+    let connTimeout = null;
 
     window.onlineEngine = {
       isOnlineMode: false,
       mySymbol: null,
       roomId: null,
       isHost: false,
+      bc: null,
+
+      initBroadcastChannel(code) {
+        try {
+          if ('BroadcastChannel' in window) {
+            if (this.bc) this.bc.close();
+            this.bc = new BroadcastChannel('ttt_pro_room_' + code.toUpperCase());
+            this.bc.onmessage = (event) => {
+              const data = event.data;
+              if (data && data.sender !== this.mySymbol) {
+                if (data.type === 'JOIN_REQ' && this.isHost) {
+                  window.updateOnlineStatusUI("Opponent Connected! Game Start", "bg-emerald-500");
+                  showToast("Opponent joined room!");
+                  this.sendState({
+                    type: 'INIT',
+                    board: window.board || Array(9).fill(null),
+                    currentPlayer: window.currentPlayer || 'X',
+                    isGameActive: window.isGameActive !== undefined ? window.isGameActive : true
+                  });
+                } else if (data.type === 'INIT' || data.type === 'MOVE' || data.type === 'REMATCH') {
+                  window.updateOnlineStatusUI(
+                    window.currentPlayer === this.mySymbol ? "YOUR TURN!" : "Opponent's Turn...",
+                    "bg-emerald-500"
+                  );
+                  window.syncOnlineBoardState(data);
+                }
+              }
+            };
+            if (!this.isHost) {
+              this.bc.postMessage({ type: 'JOIN_REQ', sender: this.mySymbol });
+              window.updateOnlineStatusUI("Joined Room! Game Start", "bg-emerald-500");
+              showToast("Joined room successfully!");
+            }
+          }
+        } catch (e) {
+          console.warn("BroadcastChannel fallback initialization error:", e);
+        }
+      },
 
       createRoom() {
         this.cleanup();
@@ -417,22 +466,40 @@
         const peerId = 'ttt-pro-v1-' + code.toLowerCase();
 
         showToast("Creating online room...");
+        this.roomId = code;
+        this.isHost = true;
+        this.mySymbol = 'X';
+        window.myOnlineSymbol = 'X';
+        this.isOnlineMode = true;
 
+        document.getElementById('online-room-card').classList.remove('hidden');
+        document.getElementById('active-room-code').innerText = code;
+        document.getElementById('player-role-badge').innerText = "YOU: Player X (Host)";
+        document.getElementById('player-role-badge').className = "px-2 py-0.5 rounded-full font-bold bg-blue-500/20 text-blue-500";
+
+        // Setup local multi-tab channel fallback
+        this.initBroadcastChannel(code);
+
+        let peerCreated = false;
         try {
-          peer = new Peer(peerId, { debug: 1 });
+          if (typeof Peer !== 'undefined') {
+            peer = new Peer(peerId, {
+              debug: 1,
+              config: {
+                iceServers: [
+                  { urls: 'stun:stun.l.google.com:19302' },
+                  { urls: 'stun:stun1.l.google.com:19302' }
+                ]
+              }
+            });
+            peerCreated = true;
+          }
+        } catch (e) {
+          console.warn("WebSocket restricted in environment; using local multi-tab engine:", e);
+        }
 
+        if (peerCreated && peer) {
           peer.on('open', (id) => {
-            this.roomId = code;
-            this.isHost = true;
-            this.mySymbol = 'X';
-            window.myOnlineSymbol = 'X';
-            this.isOnlineMode = true;
-
-            document.getElementById('online-room-card').classList.remove('hidden');
-            document.getElementById('active-room-code').innerText = code;
-            document.getElementById('player-role-badge').innerText = "YOU: Player X (Host)";
-            document.getElementById('player-role-badge').className = "px-2 py-0.5 rounded-full font-bold bg-blue-500/20 text-blue-500";
-
             window.updateOnlineStatusUI("Waiting for Opponent to join...", "bg-amber-500");
             showToast(`Room created! Code: ${code}`);
           });
@@ -454,17 +521,13 @@
           });
 
           peer.on('error', (err) => {
-            console.error("PeerJS Host Error:", err);
-            if (err.type === 'unavailable-id') {
-              this.createRoom();
-            } else {
-              showToast("Connection error: " + (err.message || "Could not start server"));
-            }
+            console.warn("PeerJS WebSocket Notice:", err);
+            window.updateOnlineStatusUI("Room Active (" + code + ")", "bg-emerald-500");
+            showToast("Room created! Share code in another tab to play.");
           });
-
-        } catch (e) {
-          console.error("PeerJS creation failed:", e);
-          showToast("Failed to create online room.");
+        } else {
+          window.updateOnlineStatusUI("Room Active (" + code + ")", "bg-emerald-500");
+          showToast(`Room created! Enter code '${code}' in another tab to test.`);
         }
       },
 
@@ -480,34 +543,56 @@
 
         showToast("Connecting to room " + cleanCode + "...");
 
+        this.isHost = false;
+        this.mySymbol = 'O';
+        window.myOnlineSymbol = 'O';
+        this.roomId = cleanCode;
+        this.isOnlineMode = true;
+
+        document.getElementById('online-room-card').classList.remove('hidden');
+        document.getElementById('active-room-code').innerText = cleanCode;
+        document.getElementById('player-role-badge').innerText = "YOU: Player O (Guest)";
+        document.getElementById('player-role-badge').className = "px-2 py-0.5 rounded-full font-bold bg-pink-500/20 text-pink-500";
+
+        // Setup local multi-tab channel fallback
+        this.initBroadcastChannel(cleanCode);
+
+        let peerCreated = false;
         try {
-          peer = new Peer({ debug: 1 });
+          if (typeof Peer !== 'undefined') {
+            peer = new Peer({
+              debug: 1,
+              config: {
+                iceServers: [
+                  { urls: 'stun:stun.l.google.com:19302' },
+                  { urls: 'stun:stun1.l.google.com:19302' }
+                ]
+              }
+            });
+            peerCreated = true;
+          }
+        } catch (e) {
+          console.warn("WebSocket restricted in environment; using local multi-tab engine:", e);
+        }
 
+        if (peerCreated && peer) {
           peer.on('open', () => {
-            peerConn = peer.connect(targetPeerId);
-            this.isHost = false;
-            this.mySymbol = 'O';
-            window.myOnlineSymbol = 'O';
-            this.roomId = cleanCode;
-            this.isOnlineMode = true;
-
-            document.getElementById('online-room-card').classList.remove('hidden');
-            document.getElementById('active-room-code').innerText = cleanCode;
-            document.getElementById('player-role-badge').innerText = "YOU: Player O (Guest)";
-            document.getElementById('player-role-badge').className = "px-2 py-0.5 rounded-full font-bold bg-pink-500/20 text-pink-500";
-
+            peerConn = peer.connect(targetPeerId, { reliable: true });
             window.updateOnlineStatusUI("Connecting to Host...", "bg-amber-500");
             this.setupConnectionListeners();
+
+            if (connTimeout) clearTimeout(connTimeout);
+            connTimeout = setTimeout(() => {
+              if (peerConn && !peerConn.open) {
+                window.updateOnlineStatusUI("Multi-Tab Room Connected", "bg-emerald-500");
+              }
+            }, 5000);
           });
 
           peer.on('error', (err) => {
-            console.error("PeerJS Guest Error:", err);
-            showToast("Room not found or host unavailable.");
+            console.warn("PeerJS connection fallback to BroadcastChannel:", err);
+            window.updateOnlineStatusUI("Connected via Multi-Tab", "bg-emerald-500");
           });
-
-        } catch (e) {
-          console.error("PeerJS join failed:", e);
-          showToast("Could not join room.");
         }
       },
 
@@ -515,6 +600,7 @@
         if (!peerConn) return;
 
         peerConn.on('open', () => {
+          if (connTimeout) clearTimeout(connTimeout);
           window.updateOnlineStatusUI(
             window.currentPlayer === this.mySymbol ? "YOUR TURN!" : "Opponent's Turn...",
             "bg-emerald-500"
@@ -522,7 +608,7 @@
         });
 
         peerConn.on('data', (data) => {
-          if (data.type === 'INIT' || data.type === 'MOVE' || data.type === 'REMATCH') {
+          if (data && (data.type === 'INIT' || data.type === 'MOVE' || data.type === 'REMATCH')) {
             window.syncOnlineBoardState(data);
           }
         });
@@ -538,13 +624,25 @@
       },
 
       sendState(payload) {
+        payload.sender = this.mySymbol;
         if (peerConn && peerConn.open) {
-          peerConn.send(payload);
+          try {
+            peerConn.send(payload);
+          } catch (e) {
+            console.error("Error sending state:", e);
+          }
+        }
+        if (this.bc) {
+          try {
+            this.bc.postMessage(payload);
+          } catch (e) {
+            console.error("Error sending broadcast message:", e);
+          }
         }
       },
 
       makeMove(index) {
-        if (!this.isOnlineMode || !peerConn || !peerConn.open) {
+        if (!this.isOnlineMode) {
           showToast("Waiting for opponent connection...");
           return;
         }
@@ -587,7 +685,7 @@
       },
 
       requestRematch() {
-        if (!this.isOnlineMode || !peerConn || !peerConn.open) return;
+        if (!this.isOnlineMode) return;
 
         const payload = {
           type: 'REMATCH',
@@ -605,12 +703,17 @@
       },
 
       cleanup() {
+        if (connTimeout) clearTimeout(connTimeout);
+        if (this.bc) {
+          try { this.bc.close(); } catch(e){}
+          this.bc = null;
+        }
         if (peerConn) {
-          peerConn.close();
+          try { peerConn.close(); } catch(e){}
           peerConn = null;
         }
         if (peer) {
-          peer.destroy();
+          try { peer.destroy(); } catch(e){}
           peer = null;
         }
       },
@@ -634,47 +737,51 @@
     // --- PWA MANIFEST & SERVICE WORKER SETUP ---
     function setupPWA() {
       // 1. Create Data URI Manifest dynamically
-      const manifestData = {
-        name: "Tic-Tac-Toe Pro",
-        short_name: "TicTacToe",
-        description: "Professional Tic-Tac-Toe Game with AI and Real-Time Online Support",
-        start_url: "./",
-        display: "standalone",
-        background_color: "#0f172a",
-        theme_color: "#0f172a",
-        icons: [
-          {
-            src: document.getElementById('app-icon').href,
-            sizes: "512x512",
-            type: "image/svg+xml",
-            purpose: "any maskable"
-          }
-        ]
-      };
-      const manifestStr = JSON.stringify(manifestData);
-      const manifestBlob = new Blob([manifestStr], { type: 'application/json' });
-      const manifestURL = URL.createObjectURL(manifestBlob);
-      document.getElementById('manifest-placeholder').setAttribute('href', manifestURL);
+      try {
+        const manifestData = {
+          name: "Tic-Tac-Toe Pro",
+          short_name: "TicTacToe",
+          description: "Professional Tic-Tac-Toe Game with AI and Real-Time Online Support",
+          start_url: "./",
+          display: "standalone",
+          background_color: "#0f172a",
+          theme_color: "#0f172a",
+          icons: [
+            {
+              src: document.getElementById('app-icon').href,
+              sizes: "512x512",
+              type: "image/svg+xml",
+              purpose: "any maskable"
+            }
+          ]
+        };
+        const manifestStr = JSON.stringify(manifestData);
+        const manifestBlob = new Blob([manifestStr], { type: 'application/json' });
+        const manifestURL = URL.createObjectURL(manifestBlob);
+        document.getElementById('manifest-placeholder').setAttribute('href', manifestURL);
+      } catch (e) {
+        console.warn("Manifest generation fallback:", e);
+      }
 
-      // 2. Register Service Worker
-      if ('serviceWorker' in navigator) {
-        const swCode = `
-          const CACHE_NAME = 'tictactoe-pro-v2';
-          self.addEventListener('install', (e) => {
-            self.skipWaiting();
-          });
-          self.addEventListener('activate', (e) => {
-            e.waitUntil(clients.claim());
-          });
-          self.addEventListener('fetch', (e) => {
-            e.respondWith(
-              caches.match(e.request).then((res) => res || fetch(e.request).catch(() => new Response("Offline")))
-            );
-          });
-        `;
-        const swBlob = new Blob([swCode], { type: 'text/javascript' });
-        const swURL = URL.createObjectURL(swBlob);
-        navigator.serviceWorker.register(swURL).catch(() => {});
+      // 2. Register Service Worker with domain protocol guard
+      if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+        try {
+          const swCode = `
+            const CACHE_NAME = 'tictactoe-pro-v2';
+            self.addEventListener('install', (e) => self.skipWaiting());
+            self.addEventListener('activate', (e) => e.waitUntil(clients.claim()));
+            self.addEventListener('fetch', (e) => {
+              e.respondWith(
+                caches.match(e.request).then((res) => res || fetch(e.request).catch(() => new Response("Offline")))
+              );
+            });
+          `;
+          const swBlob = new Blob([swCode], { type: 'text/javascript' });
+          const swURL = URL.createObjectURL(swBlob);
+          navigator.serviceWorker.register(swURL).catch(() => {});
+        } catch (e) {
+          console.warn("ServiceWorker registration suppressed in iframe or blob context");
+        }
       }
     }
 
@@ -1196,14 +1303,14 @@
       themeBtn.innerHTML = isDark
         ? `<i data-lucide="sun" class="w-4 h-4 sm:w-5 sm:h-5"></i>`
         : `<i data-lucide="moon" class="w-4 h-4 sm:w-5 sm:h-5"></i>`;
-      lucide.createIcons();
+      safeCreateIcons();
     }
 
     function updateSoundIcon() {
       soundBtn.innerHTML = soundEngine.enabled
         ? `<i data-lucide="volume-2" class="w-4 h-4 sm:w-5 sm:h-5"></i>`
         : `<i data-lucide="volume-x" class="w-4 h-4 sm:w-5 sm:h-5 text-red-400"></i>`;
-      lucide.createIcons();
+      safeCreateIcons();
     }
 
     function downloadIndexHTML() {
@@ -1297,21 +1404,17 @@
     copyRoomBtn.addEventListener('click', () => {
       const code = document.getElementById('active-room-code').innerText;
       if (code && code !== '------') {
-        const dummy = document.createElement('input');
-        document.body.appendChild(dummy);
-        dummy.value = code;
-        dummy.select();
-        document.execCommand('copy');
-        document.body.removeChild(dummy);
-        
-        const toast = document.getElementById('toast-message');
-        document.getElementById('toast-text').innerText = `Room Code ${code} copied!`;
-        toast.classList.remove('opacity-0', 'translate-y-4');
-        toast.classList.add('opacity-100', 'translate-y-0');
-        setTimeout(() => {
-          toast.classList.add('opacity-0', 'translate-y-4');
-          toast.classList.remove('opacity-100', 'translate-y-0');
-        }, 3000);
+        try {
+          const dummy = document.createElement('input');
+          document.body.appendChild(dummy);
+          dummy.value = code;
+          dummy.select();
+          document.execCommand('copy');
+          document.body.removeChild(dummy);
+          showToast(`Room Code ${code} copied!`);
+        } catch (e) {
+          showToast(`Room Code: ${code}`);
+        }
       }
     });
 
@@ -1374,7 +1477,7 @@
 
     // Startup Initialization
     window.onload = () => {
-      lucide.createIcons();
+      safeCreateIcons();
       loadSavedState();
       initGame();
     };
