@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <title>Tic-Tac-Toe</title>
+  <title>Tic-Tac-Toe Pro | PWA & Real-Time Multiplayer</title>
 
   <!-- PWA Meta Tags -->
   <meta name="description" content="Professional Tic-Tac-Toe web application featuring an unbeatable Minimax AI, real-time multiplayer, sound effects, stats tracking, and offline PWA support." />
@@ -23,6 +23,9 @@
   <!-- Tailwind CSS & Canvas Confetti -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <!-- PeerJS WebRTC Engine -->
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
@@ -375,58 +378,12 @@
     </div>
   </div>
 
-  <!-- Firebase JS Modules -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-    // Global variables provided by environment
-    const appId = typeof __app_id !== 'undefined' ? __app_id : 'tictactoe-pro-default';
-    const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
-      apiKey: "demo-api-key",
-      authDomain: "demo-project.firebaseapp.com",
-      projectId: "demo-project",
-      storageBucket: "demo-project.appspot.com",
-      messagingSenderId: "123456789",
-      appId: "1:123456789:web:abcdef"
-    };
-
-    let app, auth, db;
-    let currentUser = null;
-    let currentRoomId = null;
-    let roomUnsubscribe = null;
-    let myOnlineSymbol = null; // 'X' or 'O'
-
-    // Initialize Firebase Services
-    try {
-      app = initializeApp(firebaseConfig);
-      auth = getAuth(app);
-      db = getFirestore(app);
-
-      // Authenticate
-      async function authenticate() {
-        try {
-          if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-            const userCred = await signInWithCustomToken(auth, __initial_auth_token);
-            currentUser = userCred.user;
-          } else {
-            const userCred = await signInAnonymously(auth);
-            currentUser = userCred.user;
-          }
-        } catch (err) {
-          console.warn("Auth initialization fallback:", err);
-        }
-      }
-      authenticate();
-    } catch (e) {
-      console.warn("Firebase config fallback mode active:", e);
-    }
-
-    // Toast Notification helper
+  <!-- PeerJS WebRTC Real-Time Multiplayer Engine -->
+  <script>
     function showToast(msg) {
       const toast = document.getElementById('toast-message');
       const toastText = document.getElementById('toast-text');
+      if (!toast || !toastText) return;
       toastText.innerText = msg;
       toast.classList.remove('opacity-0', 'translate-y-4');
       toast.classList.add('opacity-100', 'translate-y-0');
@@ -436,7 +393,6 @@
       }, 3000);
     }
 
-    // Generate Room Code (6 Uppercase AlphaNumeric)
     function generateRoomCode() {
       const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
       let result = '';
@@ -446,207 +402,225 @@
       return result;
     }
 
-    // Expose Online Sync Functions to Window scope
+    let peer = null;
+    let peerConn = null;
+
     window.onlineEngine = {
       isOnlineMode: false,
       mySymbol: null,
       roomId: null,
+      isHost: false,
 
-      async createRoom() {
-        if (!currentUser) {
-          showToast("Authenticating online session... please try again in a moment.");
-          return;
-        }
-
+      createRoom() {
+        this.cleanup();
         const code = generateRoomCode();
-        const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', code);
+        const peerId = 'ttt-pro-v1-' + code.toLowerCase();
 
-        const initialRoomState = {
-          hostId: currentUser.uid,
-          guestId: null,
-          board: Array(9).fill(null),
-          currentPlayer: 'X',
-          isGameActive: true,
-          winner: null,
-          winComboIndex: null,
-          winningCombo: null,
-          rematchRequestedBy: null,
-          updatedAt: Date.now()
-        };
+        showToast("Creating online room...");
 
         try {
-          await setDoc(roomRef, initialRoomState);
-          this.joinRoomByCode(code, true);
-          showToast(`Room created! Code: ${code}`);
-        } catch (err) {
-          console.error("Error creating room:", err);
+          peer = new Peer(peerId, { debug: 1 });
+
+          peer.on('open', (id) => {
+            this.roomId = code;
+            this.isHost = true;
+            this.mySymbol = 'X';
+            window.myOnlineSymbol = 'X';
+            this.isOnlineMode = true;
+
+            document.getElementById('online-room-card').classList.remove('hidden');
+            document.getElementById('active-room-code').innerText = code;
+            document.getElementById('player-role-badge').innerText = "YOU: Player X (Host)";
+            document.getElementById('player-role-badge').className = "px-2 py-0.5 rounded-full font-bold bg-blue-500/20 text-blue-500";
+
+            window.updateOnlineStatusUI("Waiting for Opponent to join...", "bg-amber-500");
+            showToast(`Room created! Code: ${code}`);
+          });
+
+          peer.on('connection', (conn) => {
+            peerConn = conn;
+            this.setupConnectionListeners();
+
+            setTimeout(() => {
+              this.sendState({
+                type: 'INIT',
+                board: window.board || Array(9).fill(null),
+                currentPlayer: window.currentPlayer || 'X',
+                isGameActive: window.isGameActive !== undefined ? window.isGameActive : true
+              });
+              window.updateOnlineStatusUI("Opponent Connected! Game Start", "bg-emerald-500");
+              showToast("Opponent joined the room!");
+            }, 300);
+          });
+
+          peer.on('error', (err) => {
+            console.error("PeerJS Host Error:", err);
+            if (err.type === 'unavailable-id') {
+              this.createRoom();
+            } else {
+              showToast("Connection error: " + (err.message || "Could not start server"));
+            }
+          });
+
+        } catch (e) {
+          console.error("PeerJS creation failed:", e);
           showToast("Failed to create online room.");
         }
       },
 
-      async joinRoomByCode(code, isHost = false) {
-        if (!currentUser) {
-          showToast("Authenticating... please try again.");
-          return;
-        }
-
+      joinRoomByCode(code) {
         const cleanCode = code.trim().toUpperCase();
         if (cleanCode.length < 4) {
           showToast("Please enter a valid Room Code");
           return;
         }
 
-        const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', cleanCode);
+        this.cleanup();
+        const targetPeerId = 'ttt-pro-v1-' + cleanCode.toLowerCase();
+
+        showToast("Connecting to room " + cleanCode + "...");
 
         try {
-          const snapshot = await getDoc(roomRef);
-          if (!snapshot.exists()) {
-            showToast("Room not found! Check code and try again.");
-            return;
-          }
+          peer = new Peer({ debug: 1 });
 
-          const roomData = snapshot.data();
+          peer.on('open', () => {
+            peerConn = peer.connect(targetPeerId);
+            this.isHost = false;
+            this.mySymbol = 'O';
+            window.myOnlineSymbol = 'O';
+            this.roomId = cleanCode;
+            this.isOnlineMode = true;
 
-          if (!isHost && roomData.hostId !== currentUser.uid && !roomData.guestId) {
-            // Join as Guest (Player O)
-            await updateDoc(roomRef, {
-              guestId: currentUser.uid,
-              updatedAt: Date.now()
-            });
-          }
+            document.getElementById('online-room-card').classList.remove('hidden');
+            document.getElementById('active-room-code').innerText = cleanCode;
+            document.getElementById('player-role-badge').innerText = "YOU: Player O (Guest)";
+            document.getElementById('player-role-badge').className = "px-2 py-0.5 rounded-full font-bold bg-pink-500/20 text-pink-500";
 
-          // Unsubscribe previous room listener if active
-          if (roomUnsubscribe) roomUnsubscribe();
-
-          currentRoomId = cleanCode;
-          this.roomId = cleanCode;
-          this.isOnlineMode = true;
-
-          // Update Room UI Elements
-          document.getElementById('online-room-card').classList.remove('hidden');
-          document.getElementById('active-room-code').innerText = cleanCode;
-
-          // Listen to Real-Time Updates
-          roomUnsubscribe = onSnapshot(roomRef, (docSnap) => {
-            if (!docSnap.exists()) {
-              showToast("Room was closed by host.");
-              this.leaveRoom();
-              return;
-            }
-            const data = docSnap.data();
-            this.handleRoomUpdate(data);
-          }, (error) => {
-            console.error("Room snapshot error:", error);
+            window.updateOnlineStatusUI("Connecting to Host...", "bg-amber-500");
+            this.setupConnectionListeners();
           });
 
-        } catch (err) {
-          console.error("Error joining room:", err);
+          peer.on('error', (err) => {
+            console.error("PeerJS Guest Error:", err);
+            showToast("Room not found or host unavailable.");
+          });
+
+        } catch (e) {
+          console.error("PeerJS join failed:", e);
           showToast("Could not join room.");
         }
       },
 
-      handleRoomUpdate(data) {
-        // Determine role
-        if (data.hostId === currentUser.uid) {
-          this.mySymbol = 'X';
-          myOnlineSymbol = 'X';
-          document.getElementById('player-role-badge').innerText = "YOU: Player X (Host)";
-          document.getElementById('player-role-badge').className = "px-2 py-0.5 rounded-full font-bold bg-blue-500/20 text-blue-500";
-        } else {
-          this.mySymbol = 'O';
-          myOnlineSymbol = 'O';
-          document.getElementById('player-role-badge').innerText = "YOU: Player O (Guest)";
-          document.getElementById('player-role-badge').className = "px-2 py-0.5 rounded-full font-bold bg-pink-500/20 text-pink-500";
-        }
+      setupConnectionListeners() {
+        if (!peerConn) return;
 
-        // Check if waiting for Guest
-        if (!data.guestId) {
-          window.updateOnlineStatusUI("Waiting for Opponent to join...", "bg-amber-500");
-        } else {
-          // Sync Game state to window game engine
-          window.syncOnlineBoardState(data);
+        peerConn.on('open', () => {
+          window.updateOnlineStatusUI(
+            window.currentPlayer === this.mySymbol ? "YOUR TURN!" : "Opponent's Turn...",
+            "bg-emerald-500"
+          );
+        });
+
+        peerConn.on('data', (data) => {
+          if (data.type === 'INIT' || data.type === 'MOVE' || data.type === 'REMATCH') {
+            window.syncOnlineBoardState(data);
+          }
+        });
+
+        peerConn.on('close', () => {
+          showToast("Opponent disconnected.");
+          window.updateOnlineStatusUI("Opponent Disconnected", "bg-red-500");
+        });
+
+        peerConn.on('error', (err) => {
+          console.error("Connection error:", err);
+        });
+      },
+
+      sendState(payload) {
+        if (peerConn && peerConn.open) {
+          peerConn.send(payload);
         }
       },
 
-      async makeMove(index) {
-        if (!this.roomId || !currentUser) return;
-        const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', this.roomId);
-
-        try {
-          const snap = await getDoc(roomRef);
-          if (!snap.exists()) return;
-          const data = snap.data();
-
-          if (!data.guestId) {
-            showToast("Waiting for opponent to join room!");
-            return;
-          }
-
-          if (data.currentPlayer !== this.mySymbol || !data.isGameActive || data.board[index] !== null) {
-            return;
-          }
-
-          const newBoard = [...data.board];
-          newBoard[index] = this.mySymbol;
-
-          const winInfo = window.checkWinLogic(newBoard);
-          let isGameActive = true;
-          let winner = null;
-          let winComboIndex = null;
-          let winningCombo = null;
-
-          if (winInfo) {
-            isGameActive = false;
-            winner = winInfo.winner;
-            winComboIndex = winInfo.comboIndex;
-            winningCombo = winInfo.combo;
-          } else if (newBoard.every(cell => cell !== null)) {
-            isGameActive = false;
-            winner = 'tie';
-          }
-
-          await updateDoc(roomRef, {
-            board: newBoard,
-            currentPlayer: this.mySymbol === 'X' ? 'O' : 'X',
-            isGameActive,
-            winner,
-            winComboIndex,
-            winningCombo,
-            rematchRequestedBy: null,
-            updatedAt: Date.now()
-          });
-
-        } catch (err) {
-          console.error("Online move failed:", err);
+      makeMove(index) {
+        if (!this.isOnlineMode || !peerConn || !peerConn.open) {
+          showToast("Waiting for opponent connection...");
+          return;
         }
+
+        if (window.currentPlayer !== this.mySymbol || !window.isGameActive || window.board[index] !== null) {
+          return;
+        }
+
+        const newBoard = [...window.board];
+        newBoard[index] = this.mySymbol;
+
+        const winInfo = window.checkWinLogic(newBoard);
+        let isGameActive = true;
+        let winner = null;
+        let winComboIndex = null;
+        let winningCombo = null;
+
+        if (winInfo) {
+          isGameActive = false;
+          winner = winInfo.winner;
+          winComboIndex = winInfo.comboIndex;
+          winningCombo = winInfo.combo;
+        } else if (newBoard.every(cell => cell !== null)) {
+          isGameActive = false;
+          winner = 'tie';
+        }
+
+        const payload = {
+          type: 'MOVE',
+          board: newBoard,
+          currentPlayer: this.mySymbol === 'X' ? 'O' : 'X',
+          isGameActive,
+          winner,
+          winComboIndex,
+          winningCombo
+        };
+
+        window.syncOnlineBoardState(payload);
+        this.sendState(payload);
       },
 
-      async requestRematch() {
-        if (!this.roomId) return;
-        const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', this.roomId);
-        try {
-          await updateDoc(roomRef, {
-            board: Array(9).fill(null),
-            currentPlayer: 'X',
-            isGameActive: true,
-            winner: null,
-            winComboIndex: null,
-            winningCombo: null,
-            rematchRequestedBy: currentUser.uid,
-            updatedAt: Date.now()
-          });
-          showToast("Match restarted!");
-        } catch (err) {
-          console.error("Rematch request failed:", err);
+      requestRematch() {
+        if (!this.isOnlineMode || !peerConn || !peerConn.open) return;
+
+        const payload = {
+          type: 'REMATCH',
+          board: Array(9).fill(null),
+          currentPlayer: 'X',
+          isGameActive: true,
+          winner: null,
+          winComboIndex: null,
+          winningCombo: null
+        };
+
+        window.syncOnlineBoardState(payload);
+        this.sendState(payload);
+        showToast("Match restarted!");
+      },
+
+      cleanup() {
+        if (peerConn) {
+          peerConn.close();
+          peerConn = null;
+        }
+        if (peer) {
+          peer.destroy();
+          peer = null;
         }
       },
 
       leaveRoom() {
-        if (roomUnsubscribe) roomUnsubscribe();
+        this.cleanup();
         this.isOnlineMode = false;
         this.roomId = null;
         this.mySymbol = null;
-        myOnlineSymbol = null;
+        window.myOnlineSymbol = null;
         document.getElementById('online-room-card').classList.add('hidden');
         document.getElementById('room-code-input').value = '';
         window.initGame();
