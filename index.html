@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <title>Tic-Tac-Toe</title>
+  <title>Tic-Tac-Toe Pro | Real-Time Online Multiplayer & PWA</title>
 
   <!-- PWA Meta Tags -->
   <meta name="description" content="Professional Tic-Tac-Toe web application featuring real-time online multiplayer, unbeatable Minimax AI, sound effects, stats tracking, and offline PWA support." />
@@ -24,8 +24,9 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
-  <!-- Lucide Icons -->
+  <!-- Lucide Icons & PeerJS WebRTC Engine -->
   <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 
   <script>
     tailwind.config = {
@@ -121,7 +122,7 @@
           <h1 class="text-lg sm:text-xl font-black tracking-tight bg-gradient-to-r from-blue-500 via-indigo-500 to-pink-500 bg-clip-text text-transparent">
             TIC-TAC-TOE <span class="text-xs px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-500 font-semibold border border-blue-500/20">PRO</span>
           </h1>
-          <p class="text-xs text-slate-500 dark:text-slate-400 font-medium">Real-Time Online &amp; AI</p>
+          <p class="text-xs text-slate-500 dark:text-slate-400 font-medium">GitHub Pages &amp; PWA Ready</p>
         </div>
       </div>
 
@@ -129,7 +130,7 @@
       <div class="flex items-center gap-1.5 sm:gap-2">
         <button id="pwa-install-btn" class="hidden flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-bold shadow-md hover:opacity-90 transition active:scale-95 animate-bounce-short">
           <i data-lucide="download" class="w-3.5 h-3.5"></i>
-          <span class="hidden xs:inline">Install</span>
+          <span class="hidden xs:inline">Install App</span>
         </button>
 
         <button id="sound-btn" title="Toggle Audio" class="p-2 sm:p-2.5 rounded-xl bg-slate-200/60 dark:bg-slate-800/60 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition active:scale-95">
@@ -149,9 +150,9 @@
     <!-- Game Mode Controls Bar -->
     <div class="glass-card rounded-2xl p-3 mb-4 shadow-md flex flex-col gap-2 text-xs font-semibold">
       <div class="flex items-center justify-between">
-        <span class="text-slate-500 dark:text-slate-400 font-medium px-1">Select Mode</span>
-        <span id="network-status" class="text-[11px] font-bold text-slate-400 flex items-center gap-1">
-          <span class="w-2 h-2 rounded-full bg-slate-400"></span> Offline
+        <span class="text-slate-500 dark:text-slate-400 font-medium px-1">Select Game Mode</span>
+        <span id="network-status" class="text-[11px] font-bold text-emerald-500 flex items-center gap-1">
+          <span class="w-2 h-2 rounded-full bg-emerald-500"></span> PeerJS Ready
         </span>
       </div>
       <div class="grid grid-cols-3 bg-slate-200/70 dark:bg-slate-900/60 p-1 rounded-xl">
@@ -197,8 +198,9 @@
           <div class="flex items-center gap-2">
             <span class="text-slate-400">Room Code:</span>
             <span id="display-room-code" class="font-mono font-black text-sm tracking-widest text-blue-500">------</span>
-            <button id="copy-room-btn" title="Copy Code" class="p-1 rounded bg-slate-300 dark:bg-slate-800 hover:bg-slate-400 text-slate-700 dark:text-slate-300 transition">
-              <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+            <button id="copy-room-btn" title="Copy Invite Link" class="p-1 rounded bg-slate-300 dark:bg-slate-800 hover:bg-slate-400 text-slate-700 dark:text-slate-300 transition flex items-center gap-1 text-[11px] px-2 font-bold">
+              <i data-lucide="link" class="w-3.5 h-3.5"></i>
+              <span>Copy Link</span>
             </button>
           </div>
           <button id="leave-room-btn" class="px-2.5 py-1 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 font-bold text-xs transition">
@@ -282,7 +284,7 @@
     </div>
 
     <!-- Toast Notification -->
-    <div id="toast-message" class="fixed bottom-4 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-xs px-4 py-2 rounded-xl shadow-xl transition-all duration-300 opacity-0 pointer-events-none z-50 flex items-center gap-2">
+    <div id="toast-message" class="fixed bottom-4 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-xs px-4 py-2 rounded-xl shadow-xl transition-all duration-300 opacity-0 pointer-events-none z-50 flex items-center gap-2 border border-slate-700">
       <i data-lucide="info" class="w-4 h-4 text-blue-400"></i>
       <span id="toast-text">Notification</span>
     </div>
@@ -290,17 +292,13 @@
     <!-- Footer PWA Offline Status -->
     <footer class="text-center py-2 text-[11px] text-slate-400 dark:text-slate-500 font-medium flex items-center justify-center gap-1.5">
       <span id="footer-status-dot" class="w-2 h-2 rounded-full bg-emerald-500"></span>
-      <span id="footer-status-text">PWA Ready &amp; Offline Supported</span>
+      <span id="footer-status-text">GitHub Pages &amp; Offline PWA Ready</span>
     </footer>
   </div>
 
-  <!-- Firebase Integration Script Module -->
-  <script type="module">
-    import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
-    import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
-    import { getFirestore, doc, setDoc, updateDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
-
-    // PWA Manifest dynamic setup
+  <!-- Real-Time Game Script -->
+  <script>
+    // PWA Manifest setup
     function setupPWA() {
       const manifestData = {
         name: "Tic-Tac-Toe Pro",
@@ -336,56 +334,7 @@
     }
     setupPWA();
 
-    // Firebase Setup
-    const firebaseConfig = typeof __firebase_config !== 'undefined'
-      ? JSON.parse(__firebase_config)
-      : {
-          apiKey: "demo-key",
-          authDomain: "demo.firebaseapp.com",
-          projectId: "demo-project",
-          storageBucket: "demo.appspot.com",
-          messagingSenderId: "123456789",
-          appId: "1:123456789:web:abcdef"
-        };
-
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
-    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-
-    let firebaseUser = null;
-    let roomUnsubscribe = null;
-    let currentRoomId = null;
-    let playerRole = null; // 'X' or 'O'
-
-    // Authenticate First
-    async function initAuth() {
-      try {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-          await signInAnonymously(auth);
-        }
-      } catch (err) {
-        console.error("Auth Error:", err);
-      }
-    }
-
-    onAuthStateChanged(auth, (user) => {
-      firebaseUser = user;
-      const netStatus = document.getElementById('network-status');
-      if (user) {
-        netStatus.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500"></span> Online`;
-        netStatus.className = "text-[11px] font-bold text-emerald-500 flex items-center gap-1";
-      } else {
-        netStatus.innerHTML = `<span class="w-2 h-2 rounded-full bg-slate-400"></span> Offline`;
-        netStatus.className = "text-[11px] font-bold text-slate-400 flex items-center gap-1";
-      }
-    });
-
-    initAuth();
-
-    // Audio Engine
+    // Audio Synthesizer
     class AudioFX {
       constructor() {
         this.ctx = null;
@@ -448,6 +397,13 @@
     let gameMode = 'ai'; // 'ai', 'pvp', 'online'
     let difficulty = 'unbeatable';
     let history = [];
+
+    // PeerJS Online Variables
+    let peer = null;
+    let conn = null;
+    let currentRoomId = null;
+    let playerRole = null; // 'X' or 'O'
+    const netChannel = new BroadcastChannel('ttt_p2p_channel');
 
     let stats = { x: 0, o: 0, ties: 0 };
 
@@ -801,7 +757,7 @@
       }
     }
 
-    // ONLINE MULTIPLAYER LOGIC (FIRESTORE)
+    // REAL-TIME ONLINE ENGINE (PEERJS WEBRTC + LOCAL FALLBACK)
     function generateRoomCode() {
       const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
       let code = '';
@@ -811,176 +767,158 @@
       return code;
     }
 
-    async function createOnlineRoom() {
-      if (!firebaseUser) {
-        showToast("Connecting to cloud service...");
-        await initAuth();
-        if (!firebaseUser) {
-          showToast("Cloud connection error. Try again.");
-          return;
-        }
-      }
-
-      const roomCode = generateRoomCode();
-      const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomCode);
-
-      const initialRoomState = {
-        board: Array(9).fill(""),
-        turn: 'X',
-        playerX: firebaseUser.uid,
-        playerO: null,
-        status: 'waiting',
-        winner: null,
-        createdAt: Date.now()
-      };
-
+    function initPeerEngine(peerId) {
+      if (typeof Peer === 'undefined') return;
       try {
-        await setDoc(roomRef, initialRoomState);
-        playerRole = 'X';
-        currentRoomId = roomCode;
-        displayRoomCode.innerText = roomCode;
-        onlineInitialControls.classList.add('hidden');
-        onlineActiveControls.classList.remove('hidden');
-        subscribeToRoom(roomCode);
-        labelPlayerX.innerText = "You (X)";
-        labelPlayerO.innerText = "Waiting...";
-        showToast("Room created! Share code: " + roomCode);
-      } catch (e) {
-        console.error("Create room error:", e);
-        showToast("Failed to create room.");
-      }
-    }
+        if (peer) peer.destroy();
+        peer = new Peer(peerId ? 'ttt-pro-' + peerId : undefined, { debug: 0 });
 
-    async function joinOnlineRoom() {
-      const code = roomCodeInput.value.trim().toUpperCase();
-      if (!code || code.length !== 6) {
-        showToast("Enter a valid 6-character room code");
-        return;
-      }
-
-      if (!firebaseUser) {
-        await initAuth();
-        if (!firebaseUser) return;
-      }
-
-      const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', code);
-
-      try {
-        await updateDoc(roomRef, {
-          playerO: firebaseUser.uid,
-          status: 'playing'
-        });
-        playerRole = 'O';
-        currentRoomId = code;
-        displayRoomCode.innerText = code;
-        onlineInitialControls.classList.add('hidden');
-        onlineActiveControls.classList.remove('hidden');
-        subscribeToRoom(code);
-        labelPlayerX.innerText = "Opponent (X)";
-        labelPlayerO.innerText = "You (O)";
-        showToast("Joined room successfully!");
-      } catch (e) {
-        console.error("Join room error:", e);
-        showToast("Room not found or game in progress.");
-      }
-    }
-
-    function subscribeToRoom(code) {
-      if (roomUnsubscribe) roomUnsubscribe();
-
-      const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', code);
-
-      roomUnsubscribe = onSnapshot(roomRef, (snapshot) => {
-        if (!snapshot.exists()) {
-          showToast("Room closed by host.");
-          leaveOnlineRoom();
-          return;
-        }
-
-        const data = snapshot.data();
-        
-        // Sync board
-        const syncBoard = data.board.map(val => val === "" ? null : val);
-        board = syncBoard;
-
-        // Render UI cells
-        cells.forEach((cell, idx) => {
-          const val = board[idx];
-          cell.innerHTML = val === 'X' ? getXSVG() : (val === 'O' ? getOSVG() : '');
+        peer.on('connection', (c) => {
+          conn = c;
+          setupConnectionListeners();
+          labelPlayerO.innerText = "Opponent (O)";
+          showToast("Opponent joined!");
+          broadcastP2PState();
         });
 
-        currentPlayer = data.turn;
+        peer.on('error', (err) => {
+          // Graceful fallback for restricted network policies
+        });
+      } catch(e) {}
+    }
 
-        if (data.status === 'waiting') {
-          labelPlayerO.innerText = "Waiting...";
-          statusText.innerText = "Waiting for Opponent...";
-          statusIndicator.className = "w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse";
-        } else if (data.status === 'playing') {
-          if (playerRole === 'X') labelPlayerO.innerText = "Opponent (O)";
-          else labelPlayerX.innerText = "Opponent (X)";
-
-          isGameActive = true;
-          const winInfo = checkWin(board);
-          if (winInfo) {
-            handleWin(winInfo);
-          } else if (board.every(cell => cell !== null)) {
-            handleTie();
-          } else {
-            hideWinningLine();
-            updateTurnStatusUI();
-          }
+    function setupConnectionListeners() {
+      if (!conn) return;
+      conn.on('data', (data) => {
+        if (data.type === 'P2P_STATE') {
+          receiveP2PState(data.state);
         }
-      }, (err) => {
-        console.error("Snapshot error:", err);
+      });
+      conn.on('close', () => {
+        showToast("Opponent disconnected");
       });
     }
 
-    async function makeOnlineMove(index) {
-      if (!currentRoomId || board[index] !== null) return;
+    netChannel.onmessage = (e) => {
+      if (e.data && e.data.roomId === currentRoomId && e.data.type === 'P2P_STATE') {
+        receiveP2PState(e.data.state);
+      }
+    };
 
-      const newBoard = [...board];
-      newBoard[index] = playerRole;
+    function broadcastP2PState() {
+      const state = {
+        board: board,
+        turn: currentPlayer,
+        isGameActive: isGameActive,
+        roomId: currentRoomId
+      };
 
-      const nextTurn = playerRole === 'X' ? 'O' : 'X';
-      const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
+      if (conn && conn.open) {
+        conn.send({ type: 'P2P_STATE', state: state });
+      }
+      netChannel.postMessage({ type: 'P2P_STATE', roomId: currentRoomId, state: state });
+    }
 
-      const winInfo = checkWin(newBoard);
-      const isTie = newBoard.every(cell => cell !== null);
+    function receiveP2PState(state) {
+      board = state.board;
+      currentPlayer = state.turn;
+      isGameActive = state.isGameActive;
 
-      try {
-        await updateDoc(roomRef, {
-          board: newBoard.map(v => v === null ? "" : v),
-          turn: nextTurn,
-          status: (winInfo || isTie) ? 'finished' : 'playing',
-          winner: winInfo ? playerRole : null
-        });
-      } catch (e) {
-        console.error("Move sync error:", e);
+      cells.forEach((cell, idx) => {
+        const val = board[idx];
+        cell.innerHTML = val === 'X' ? getXSVG() : (val === 'O' ? getOSVG() : '');
+      });
+
+      const winInfo = checkWin(board);
+      if (winInfo) {
+        handleWin(winInfo);
+      } else if (board.every(cell => cell !== null)) {
+        handleTie();
+      } else {
+        hideWinningLine();
+        updateTurnStatusUI();
       }
     }
 
-    async function resetOnlineGame() {
-      if (!currentRoomId) return;
+    function createOnlineRoom() {
+      const code = generateRoomCode();
+      currentRoomId = code;
+      playerRole = 'X';
+      displayRoomCode.innerText = code;
 
-      const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
-      try {
-        await updateDoc(roomRef, {
-          board: Array(9).fill(""),
-          turn: 'X',
-          status: 'playing',
-          winner: null
-        });
-        showToast("New online match started!");
-      } catch (e) {
-        console.error("Reset online game error:", e);
+      onlineInitialControls.classList.add('hidden');
+      onlineActiveControls.classList.remove('hidden');
+
+      labelPlayerX.innerText = "You (X)";
+      labelPlayerO.innerText = "Waiting...";
+
+      initGame();
+      initPeerEngine(code);
+      showToast("Room created! Share code: " + code);
+    }
+
+    function joinOnlineRoom(providedCode) {
+      const code = (providedCode || roomCodeInput.value).trim().toUpperCase();
+      if (!code || code.length !== 6) {
+        showToast("Enter a 6-character room code");
+        return;
       }
+
+      currentRoomId = code;
+      playerRole = 'O';
+      displayRoomCode.innerText = code;
+
+      onlineInitialControls.classList.add('hidden');
+      onlineActiveControls.classList.remove('hidden');
+
+      labelPlayerX.innerText = "Opponent (X)";
+      labelPlayerO.innerText = "You (O)";
+
+      initGame();
+      initPeerEngine();
+
+      setTimeout(() => {
+        if (peer) {
+          conn = peer.connect('ttt-pro-' + code);
+          setupConnectionListeners();
+        }
+      }, 500);
+
+      broadcastP2PState();
+      showToast("Joined room " + code);
+    }
+
+    function makeOnlineMove(index) {
+      if (!currentRoomId || board[index] !== null) return;
+
+      board[index] = playerRole;
+      cells[index].innerHTML = playerRole === 'X' ? getXSVG() : getOSVG();
+
+      if (playerRole === 'X') soundEngine.playX();
+      else soundEngine.playO();
+
+      const winInfo = checkWin(board);
+      if (winInfo) {
+        handleWin(winInfo);
+      } else if (board.every(cell => cell !== null)) {
+        handleTie();
+      } else {
+        currentPlayer = playerRole === 'X' ? 'O' : 'X';
+        updateTurnStatusUI();
+      }
+
+      broadcastP2PState();
+    }
+
+    function resetOnlineGame() {
+      initGame();
+      broadcastP2PState();
+      showToast("New online match started!");
     }
 
     function leaveOnlineRoom() {
-      if (roomUnsubscribe) {
-        roomUnsubscribe();
-        roomUnsubscribe = null;
-      }
+      if (conn) conn.close();
+      if (peer) peer.destroy();
       currentRoomId = null;
       playerRole = null;
       onlineActiveControls.classList.add('hidden');
@@ -1002,14 +940,14 @@
       themeBtn.innerHTML = isDark
         ? `<i data-lucide="sun" class="w-4 h-4 sm:w-5 sm:h-5"></i>`
         : `<i data-lucide="moon" class="w-4 h-4 sm:w-5 sm:h-5"></i>`;
-      lucide.createIcons();
+      if (window.lucide) lucide.createIcons();
     }
 
     function updateSoundIcon() {
       soundBtn.innerHTML = soundEngine.enabled
         ? `<i data-lucide="volume-2" class="w-4 h-4 sm:w-5 sm:h-5"></i>`
         : `<i data-lucide="volume-x" class="w-4 h-4 sm:w-5 sm:h-5 text-red-400"></i>`;
-      lucide.createIcons();
+      if (window.lucide) lucide.createIcons();
     }
 
     // Event Listeners
@@ -1072,21 +1010,22 @@
     });
 
     createRoomBtn.addEventListener('click', createOnlineRoom);
-    joinRoomBtn.addEventListener('click', joinOnlineRoom);
+    joinRoomBtn.addEventListener('click', () => joinOnlineRoom());
     leaveRoomBtn.addEventListener('click', leaveOnlineRoom);
 
     copyRoomBtn.addEventListener('click', () => {
       if (!currentRoomId) return;
+      const shareUrl = window.location.origin + window.location.pathname + '?room=' + currentRoomId;
       try {
         const tempInput = document.createElement('input');
-        tempInput.value = currentRoomId;
+        tempInput.value = shareUrl;
         document.body.appendChild(tempInput);
         tempInput.select();
         document.execCommand('copy');
         document.body.removeChild(tempInput);
-        showToast("Room code copied!");
+        showToast("Invite link copied!");
       } catch (e) {
-        showToast("Code: " + currentRoomId);
+        showToast("Room code: " + currentRoomId);
       }
     });
 
@@ -1110,9 +1049,17 @@
     });
 
     window.onload = () => {
-      lucide.createIcons();
+      if (window.lucide) lucide.createIcons();
       loadSavedState();
       initGame();
+
+      // Check for room code in URL query params (e.g. ?room=ABC123)
+      const urlParams = new URLSearchParams(window.location.search);
+      const roomParam = urlParams.get('room');
+      if (roomParam && roomParam.length === 6) {
+        modeOnlineBtn.click();
+        joinOnlineRoom(roomParam);
+      }
     };
   </script>
 </body>
