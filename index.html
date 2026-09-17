@@ -3,28 +3,26 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <title>Tic-Tac-Toe Pro | Real-Time Online Multiplayer & PWA</title>
+  <title>Tic-Tac-Toe</title>
 
   <!-- PWA Meta Tags -->
-  <meta name="description" content="Professional Tic-Tac-Toe web application featuring real-time online multiplayer, unbeatable Minimax AI, sound effects, stats tracking, and offline support." />
+  <meta name="description" content="Professional Tic-Tac-Toe web application featuring real-time online multiplayer, unbeatable Minimax AI, audio effects, stats tracking, and offline support." />
   <meta name="theme-color" content="#0f172a" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="TicTacToe Pro" />
 
-  <!-- SVG Logo / App Icon (Embedded Data URI) -->
+  <!-- App Icon Data URI -->
   <link id="app-icon" rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' width='512' height='512'><rect width='512' height='512' rx='128' fill='%230f172a'/><rect x='32' y='32' width='448' height='448' rx='96' fill='%231e293b' stroke='%23334155' stroke-width='8'/><path d='M180 80V432 M332 80V432 M80 180H432 M80 332H432' stroke='%23475569' stroke-width='24' stroke-linecap='round'/><path d='M100 100 L160 160 M160 100 L100 160' stroke='%233b82f6' stroke-width='24' stroke-linecap='round'/><circle cx='380' cy='130' r='32' stroke='%23ec4899' stroke-width='20' fill='none'/><path d='M350 350 L410 410 M410 350 L350 410' stroke='%233b82f6' stroke-width='24' stroke-linecap='round'/><circle cx='130' cy='380' r='32' stroke='%23ec4899' stroke-width='20' fill='none'/></svg>" />
   <link rel="apple-touch-icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' width='512' height='512'><rect width='512' height='512' rx='128' fill='%230f172a'/><rect x='32' y='32' width='448' height='448' rx='96' fill='%231e293b' stroke='%23334155' stroke-width='8'/><path d='M180 80V432 M332 80V432 M80 180H432 M80 332H432' stroke='%23475569' stroke-width='24' stroke-linecap='round'/><path d='M100 100 L160 160 M160 100 L100 160' stroke='%233b82f6' stroke-width='24' stroke-linecap='round'/><circle cx='380' cy='130' r='32' stroke='%23ec4899' stroke-width='20' fill='none'/><path d='M350 350 L410 410 M410 350 L350 410' stroke='%233b82f6' stroke-width='24' stroke-linecap='round'/><circle cx='130' cy='380' r='32' stroke='%23ec4899' stroke-width='20' fill='none'/></svg>" />
 
-  <!-- Embedded Web Manifest -->
+  <!-- Manifest Target -->
   <link rel="manifest" id="manifest-placeholder" />
 
-  <!-- Tailwind CSS & Canvas Confetti -->
+  <!-- External Libraries -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
-
-  <!-- Lucide Icons & MQTT over WebSockets Client -->
   <script src="https://unpkg.com/lucide@latest"></script>
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 
@@ -34,12 +32,11 @@
       theme: {
         extend: {
           colors: {
-            playerX: '#3b82f6', // Electric Blue
-            playerO: '#ec4899', // Vibrant Pink
+            playerX: '#3b82f6',
+            playerO: '#ec4899',
           },
           animation: {
             'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-            'bounce-short': 'bounce 0.6s ease-in-out 1',
             'scale-in': 'scaleIn 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards',
           },
           keyframes: {
@@ -54,41 +51,38 @@
   </script>
 
   <style>
-    /* Glassmorphism custom styling */
     .glass-card {
-      background: rgba(255, 255, 255, 0.7);
+      background: rgba(255, 255, 255, 0.75);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
       border: 1px solid rgba(255, 255, 255, 0.4);
     }
     .dark .glass-card {
-      background: rgba(15, 23, 42, 0.8);
+      background: rgba(15, 23, 42, 0.82);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
       border: 1px solid rgba(255, 255, 255, 0.08);
     }
 
     .cell-glow-x {
-      box-shadow: 0 0 25px rgba(59, 130, 246, 0.35);
+      box-shadow: 0 0 25px rgba(59, 130, 246, 0.4);
     }
     .cell-glow-o {
-      box-shadow: 0 0 25px rgba(236, 72, 153, 0.35);
+      box-shadow: 0 0 25px rgba(236, 72, 153, 0.4);
     }
 
-    /* SVG Winning Line Animation */
     .win-line {
       stroke-dasharray: 1000;
       stroke-dashoffset: 1000;
-      animation: dash 0.5s ease-out forwards;
+      animation: strokeDash 0.5s ease-out forwards;
     }
 
-    @keyframes dash {
+    @keyframes strokeDash {
       to {
         stroke-dashoffset: 0;
       }
     }
 
-    /* Prevent text highlight on mobile touch */
     * {
       -webkit-tap-highlight-color: transparent;
       user-select: none;
@@ -97,19 +91,16 @@
 </head>
 <body class="bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100 min-h-screen flex flex-col transition-colors duration-300 font-sans antialiased overflow-x-hidden">
 
-  <!-- Dynamic Background Glow Gradients -->
+  <!-- Background Gradients -->
   <div class="fixed inset-0 pointer-events-none overflow-hidden z-0">
     <div class="absolute -top-40 -left-40 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl dark:bg-blue-600/15"></div>
     <div class="absolute -bottom-40 -right-40 w-96 h-96 bg-pink-500/20 rounded-full blur-3xl dark:bg-pink-600/15"></div>
   </div>
 
-  <!-- App Wrapper -->
   <div class="relative z-10 flex-1 flex flex-col max-w-2xl mx-auto w-full px-4 py-4 sm:py-6 justify-between min-h-screen">
 
-    <!-- Header Navigation -->
     <header class="glass-card rounded-2xl p-3 sm:p-4 mb-4 flex items-center justify-between shadow-lg">
       <div class="flex items-center gap-3">
-        <!-- SVG Logo Banner -->
         <div class="relative w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center shadow-md overflow-hidden group">
           <svg viewBox="0 0 512 512" class="w-8 h-8 transition-transform duration-300 group-hover:scale-110">
             <path d="M180 80V432 M332 80V432 M80 180H432 M80 332H432" stroke="#475569" stroke-width="28" stroke-linecap="round"/>
@@ -122,32 +113,25 @@
           <h1 class="text-lg sm:text-xl font-black tracking-tight bg-gradient-to-r from-blue-500 via-indigo-500 to-pink-500 bg-clip-text text-transparent">
             TIC-TAC-TOE <span class="text-xs px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-500 font-semibold border border-blue-500/20">PRO</span>
           </h1>
-          <p class="text-xs text-slate-500 dark:text-slate-400 font-medium">GitHub Pages &amp; PWA Ready</p>
+          <p class="text-xs text-slate-500 dark:text-slate-400 font-medium">GitHub Pages &amp; Offline PWA</p>
         </div>
       </div>
 
-      <!-- Quick Controls -->
       <div class="flex items-center gap-1.5 sm:gap-2">
-        <button id="pwa-install-btn" class="hidden flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-bold shadow-md hover:opacity-90 transition active:scale-95 animate-bounce-short">
-          <i data-lucide="download" class="w-3.5 h-3.5"></i>
-          <span class="hidden xs:inline">Install App</span>
-        </button>
-
         <button id="sound-btn" title="Toggle Audio" class="p-2 sm:p-2.5 rounded-xl bg-slate-200/60 dark:bg-slate-800/60 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition active:scale-95">
-          <i data-lucide="volume-2" id="sound-icon" class="w-4 h-4 sm:w-5 sm:h-5"></i>
+          <i data-lucide="volume-2" class="w-4 h-4 sm:w-5 sm:h-5"></i>
         </button>
 
         <button id="theme-btn" title="Toggle Theme" class="p-2 sm:p-2.5 rounded-xl bg-slate-200/60 dark:bg-slate-800/60 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition active:scale-95">
-          <i data-lucide="moon" id="theme-icon" class="w-4 h-4 sm:w-5 sm:h-5"></i>
+          <i data-lucide="moon" class="w-4 h-4 sm:w-5 sm:h-5"></i>
         </button>
 
-        <button id="reset-stats-btn" title="Reset Statistics" class="p-2 sm:p-2.5 rounded-xl bg-slate-200/60 dark:bg-slate-800/60 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition active:scale-95">
+        <button id="reset-stats-btn" title="Reset Stats" class="p-2 sm:p-2.5 rounded-xl bg-slate-200/60 dark:bg-slate-800/60 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition active:scale-95">
           <i data-lucide="rotate-ccw" class="w-4 h-4 sm:w-5 sm:h-5"></i>
         </button>
       </div>
     </header>
 
-    <!-- Game Mode Controls Bar -->
     <div class="glass-card rounded-2xl p-3 mb-4 shadow-md flex flex-col gap-2 text-xs font-semibold">
       <div class="flex items-center justify-between">
         <span class="text-slate-500 dark:text-slate-400 font-medium px-1">Select Game Mode</span>
@@ -155,6 +139,7 @@
           <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Network Active
         </span>
       </div>
+
       <div class="grid grid-cols-3 bg-slate-200/70 dark:bg-slate-900/60 p-1 rounded-xl">
         <button id="mode-ai" class="py-1.5 rounded-lg text-center transition font-bold bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm">
           vs AI
@@ -168,7 +153,6 @@
         </button>
       </div>
 
-      <!-- AI Difficulty Selection (shown only in vs AI mode) -->
       <div id="difficulty-wrapper" class="flex flex-col gap-1 mt-1">
         <label class="text-slate-500 dark:text-slate-400 font-medium px-1">AI Difficulty</label>
         <select id="difficulty-select" class="w-full bg-slate-200/70 dark:bg-slate-900/60 border-0 rounded-xl px-2.5 py-1.5 font-bold text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 cursor-pointer outline-none">
@@ -178,7 +162,6 @@
         </select>
       </div>
 
-      <!-- Online Room Control Panel (shown only in Online mode) -->
       <div id="online-wrapper" class="hidden flex flex-col gap-2 mt-1">
         <div id="online-initial-controls" class="grid grid-cols-2 gap-2">
           <button id="create-room-btn" class="py-2 px-3 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 transition flex items-center justify-center gap-1.5">
@@ -193,7 +176,6 @@
           </div>
         </div>
 
-        <!-- Active Room Display -->
         <div id="online-active-controls" class="hidden flex items-center justify-between bg-slate-200/70 dark:bg-slate-900/60 p-2.5 rounded-xl">
           <div class="flex items-center gap-2">
             <span class="text-slate-400">Room:</span>
@@ -210,9 +192,7 @@
       </div>
     </div>
 
-    <!-- Scoreboard -->
     <div class="grid grid-cols-3 gap-2.5 mb-4">
-      <!-- Player X -->
       <div id="score-card-x" class="glass-card rounded-2xl p-3 flex flex-col items-center justify-center border-b-4 border-b-blue-500 shadow-md transition-transform duration-200">
         <div class="flex items-center gap-1 text-blue-500 font-bold text-xs uppercase tracking-wider mb-0.5">
           <i data-lucide="x" class="w-4 h-4 stroke-[3]"></i>
@@ -221,7 +201,6 @@
         <span id="score-x" class="text-2xl sm:text-3xl font-black text-slate-800 dark:text-white">0</span>
       </div>
 
-      <!-- Ties -->
       <div class="glass-card rounded-2xl p-3 flex flex-col items-center justify-center border-b-4 border-b-slate-400 dark:border-b-slate-600 shadow-md">
         <div class="flex items-center gap-1 text-slate-500 dark:text-slate-400 font-bold text-xs uppercase tracking-wider mb-0.5">
           <i data-lucide="minus" class="w-4 h-4 stroke-[3]"></i>
@@ -230,7 +209,6 @@
         <span id="score-ties" class="text-2xl sm:text-3xl font-black text-slate-800 dark:text-white">0</span>
       </div>
 
-      <!-- Player O -->
       <div id="score-card-o" class="glass-card rounded-2xl p-3 flex flex-col items-center justify-center border-b-4 border-b-pink-500 shadow-md transition-transform duration-200">
         <div class="flex items-center gap-1 text-pink-500 font-bold text-xs uppercase tracking-wider mb-0.5">
           <i data-lucide="circle" class="w-3.5 h-3.5 stroke-[3]"></i>
@@ -240,7 +218,6 @@
       </div>
     </div>
 
-    <!-- Status Display -->
     <div class="text-center mb-4 min-h-[32px] flex items-center justify-center">
       <div id="status-badge" class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs sm:text-sm font-bold shadow-sm transition-all duration-300 bg-slate-200/80 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300">
         <span id="status-indicator" class="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse"></span>
@@ -248,16 +225,13 @@
       </div>
     </div>
 
-    <!-- Main Game Board Container -->
     <div class="relative w-full max-w-[360px] sm:max-w-[420px] aspect-square mx-auto mb-4">
       <div class="glass-card w-full h-full rounded-3xl p-3 sm:p-4 shadow-2xl relative grid grid-cols-3 gap-2.5 sm:gap-3 bg-slate-200/40 dark:bg-slate-900/40">
 
-        <!-- SVG Winning Line Layer -->
         <svg id="winning-line-svg" class="absolute inset-0 w-full h-full pointer-events-none z-20" viewBox="0 0 300 300">
           <line id="winning-line" x1="0" y1="0" x2="0" y2="0" stroke="currentColor" stroke-width="12" stroke-linecap="round" class="hidden" />
         </svg>
 
-        <!-- 9 Interactive Cells -->
         <button data-cell="0" class="game-cell rounded-2xl bg-white/80 dark:bg-slate-800/80 hover:bg-white dark:hover:bg-slate-700/80 transition-all duration-200 flex items-center justify-center shadow-sm hover:shadow-md active:scale-95 text-slate-800 dark:text-white"></button>
         <button data-cell="1" class="game-cell rounded-2xl bg-white/80 dark:bg-slate-800/80 hover:bg-white dark:hover:bg-slate-700/80 transition-all duration-200 flex items-center justify-center shadow-sm hover:shadow-md active:scale-95 text-slate-800 dark:text-white"></button>
         <button data-cell="2" class="game-cell rounded-2xl bg-white/80 dark:bg-slate-800/80 hover:bg-white dark:hover:bg-slate-700/80 transition-all duration-200 flex items-center justify-center shadow-sm hover:shadow-md active:scale-95 text-slate-800 dark:text-white"></button>
@@ -270,7 +244,6 @@
       </div>
     </div>
 
-    <!-- Action Buttons -->
     <div class="flex items-center gap-3 justify-center mb-2">
       <button id="undo-btn" class="flex-1 max-w-[140px] py-3 px-4 rounded-xl glass-card text-xs sm:text-sm font-bold flex items-center justify-center gap-2 hover:bg-slate-200/80 dark:hover:bg-slate-800/80 transition active:scale-95 disabled:opacity-40 disabled:pointer-events-none">
         <i data-lucide="undo-2" class="w-4 h-4"></i>
@@ -283,22 +256,18 @@
       </button>
     </div>
 
-    <!-- Toast Notification -->
     <div id="toast-message" class="fixed bottom-4 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-xs px-4 py-2 rounded-xl shadow-xl transition-all duration-300 opacity-0 pointer-events-none z-50 flex items-center gap-2 border border-slate-700">
       <i data-lucide="info" class="w-4 h-4 text-blue-400"></i>
       <span id="toast-text">Notification</span>
     </div>
 
-    <!-- Footer PWA Offline Status -->
     <footer class="text-center py-2 text-[11px] text-slate-400 dark:text-slate-500 font-medium flex items-center justify-center gap-1.5">
-      <span id="footer-status-dot" class="w-2 h-2 rounded-full bg-emerald-500"></span>
-      <span id="footer-status-text">GitHub Pages &amp; Offline PWA Ready</span>
+      <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+      <span>GitHub Pages &amp; Offline PWA Ready</span>
     </footer>
   </div>
 
-  <!-- Real-Time Game Engine Script -->
   <script>
-    // Safe PWA Manifest Setup
     function setupPWA() {
       try {
         const manifestData = {
@@ -322,7 +291,6 @@
     }
     setupPWA();
 
-    // Audio Engine with Auto-Resume Support
     class AudioFX {
       constructor() {
         this.ctx = null;
@@ -375,7 +343,6 @@
 
     const soundEngine = new AudioFX();
 
-    // Game Variables
     const WINNING_COMBOS = [
       [0, 1, 2], [3, 4, 5], [6, 7, 8],
       [0, 3, 6], [1, 4, 7], [2, 5, 8],
@@ -385,20 +352,18 @@
     let board = Array(9).fill(null);
     let currentPlayer = 'X';
     let isGameActive = true;
-    let gameMode = 'ai'; // 'ai', 'pvp', 'online'
+    let gameMode = 'ai';
     let difficulty = 'unbeatable';
     let history = [];
     let aiTimeoutId = null;
 
-    // Online Network Variables
     let mqttClient = null;
     let isWebsocketBlocked = false;
     let myClientId = 'user_' + Math.random().toString(36).substr(2, 9);
     let currentRoomId = null;
-    let playerRole = null; // 'X' or 'O'
+    let playerRole = null;
     let currentTopic = null;
 
-    // Local Broadcast Channel Fallback
     const localChannel = new BroadcastChannel('ttt_canvas_local_sync');
 
     localChannel.onmessage = (event) => {
@@ -409,7 +374,6 @@
 
     let stats = { x: 0, o: 0, ties: 0 };
 
-    // DOM Elements
     const cells = document.querySelectorAll('.game-cell');
     const statusText = document.getElementById('status-text');
     const statusIndicator = document.getElementById('status-indicator');
@@ -448,27 +412,6 @@
       setTimeout(() => {
         toast.classList.add('opacity-0', 'pointer-events-none');
       }, 3500);
-    }
-
-    function loadSavedState() {
-      const savedStats = localStorage.getItem('ttt_pro_stats');
-      if (savedStats) {
-        try { stats = JSON.parse(savedStats); } catch(e){}
-      }
-      const savedTheme = localStorage.getItem('ttt_pro_theme');
-      if (savedTheme === 'light') document.documentElement.classList.remove('dark');
-      else document.documentElement.classList.add('dark');
-
-      const savedSound = localStorage.getItem('ttt_pro_sound');
-      if (savedSound === 'false') soundEngine.enabled = false;
-
-      updateThemeIcon();
-      updateSoundIcon();
-      updateScoreboardUI();
-    }
-
-    function saveStats() {
-      localStorage.setItem('ttt_pro_stats', JSON.stringify(stats));
     }
 
     function getXSVG() {
@@ -719,7 +662,6 @@
       winningLine.classList.remove('win-line');
     }
 
-    // AI Minimax Engine
     function getAIMove() {
       const emptyIndices = board.map((val, idx) => val === null ? idx : null).filter(val => val !== null);
       if (emptyIndices.length === 0) return null;
@@ -781,7 +723,6 @@
       }
     }
 
-    // REAL-TIME ONLINE NETWORK ENGINE
     function generateRoomCode() {
       const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
       let code = '';
@@ -819,7 +760,7 @@
           updateNetworkStatusUI('Network Active', true);
         });
 
-        mqttClient.on('error', (err) => {
+        mqttClient.on('error', () => {
           isWebsocketBlocked = true;
           updateNetworkStatusUI('Local Sync Active', false);
           if (mqttClient) {
@@ -1010,6 +951,27 @@
       showToast("Left online room");
     }
 
+    function loadSavedState() {
+      const savedStats = localStorage.getItem('ttt_pro_stats');
+      if (savedStats) {
+        try { stats = JSON.parse(savedStats); } catch(e){}
+      }
+      const savedTheme = localStorage.getItem('ttt_pro_theme');
+      if (savedTheme === 'light') document.documentElement.classList.remove('dark');
+      else document.documentElement.classList.add('dark');
+
+      const savedSound = localStorage.getItem('ttt_pro_sound');
+      if (savedSound === 'false') soundEngine.enabled = false;
+
+      updateThemeIcon();
+      updateSoundIcon();
+      updateScoreboardUI();
+    }
+
+    function saveStats() {
+      localStorage.setItem('ttt_pro_stats', JSON.stringify(stats));
+    }
+
     function updateScoreboardUI() {
       scoreXEl.innerText = stats.x;
       scoreOEl.innerText = stats.o;
@@ -1031,7 +993,6 @@
       if (window.lucide) lucide.createIcons();
     }
 
-    // Event Listeners
     cells.forEach(cell => {
       cell.addEventListener('click', () => {
         const index = parseInt(cell.getAttribute('data-cell'));
@@ -1140,7 +1101,6 @@
       loadSavedState();
       initGame();
 
-      // Check for room code in URL query params
       const urlParams = new URLSearchParams(window.location.search);
       const roomParam = urlParams.get('room');
       if (roomParam && roomParam.length === 6) {
