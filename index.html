@@ -6,7 +6,7 @@
   <title>Tic-Tac-Toe Pro | Real-Time Online Multiplayer & PWA</title>
 
   <!-- PWA Meta Tags -->
-  <meta name="description" content="Professional Tic-Tac-Toe web application featuring real-time online multiplayer, unbeatable Minimax AI, sound effects, stats tracking, and offline PWA support." />
+  <meta name="description" content="Professional Tic-Tac-Toe web application featuring real-time online multiplayer, unbeatable Minimax AI, sound effects, stats tracking, and offline support." />
   <meta name="theme-color" content="#0f172a" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -24,9 +24,9 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
-  <!-- Lucide Icons & PeerJS WebRTC Engine -->
+  <!-- Lucide Icons & MQTT over WebSockets Client -->
   <script src="https://unpkg.com/lucide@latest"></script>
-  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 
   <script>
     tailwind.config = {
@@ -152,7 +152,7 @@
       <div class="flex items-center justify-between">
         <span class="text-slate-500 dark:text-slate-400 font-medium px-1">Select Game Mode</span>
         <span id="network-status" class="text-[11px] font-bold text-emerald-500 flex items-center gap-1">
-          <span class="w-2 h-2 rounded-full bg-emerald-500"></span> PeerJS Ready
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Network Active
         </span>
       </div>
       <div class="grid grid-cols-3 bg-slate-200/70 dark:bg-slate-900/60 p-1 rounded-xl">
@@ -196,7 +196,7 @@
         <!-- Active Room Display -->
         <div id="online-active-controls" class="hidden flex items-center justify-between bg-slate-200/70 dark:bg-slate-900/60 p-2.5 rounded-xl">
           <div class="flex items-center gap-2">
-            <span class="text-slate-400">Room Code:</span>
+            <span class="text-slate-400">Room:</span>
             <span id="display-room-code" class="font-mono font-black text-sm tracking-widest text-blue-500">------</span>
             <button id="copy-room-btn" title="Copy Invite Link" class="p-1 rounded bg-slate-300 dark:bg-slate-800 hover:bg-slate-400 text-slate-700 dark:text-slate-300 transition flex items-center gap-1 text-[11px] px-2 font-bold">
               <i data-lucide="link" class="w-3.5 h-3.5"></i>
@@ -296,45 +296,33 @@
     </footer>
   </div>
 
-  <!-- Real-Time Game Script -->
+  <!-- Real-Time Game Engine Script -->
   <script>
-    // PWA Manifest setup
+    // Safe PWA Manifest Setup
     function setupPWA() {
-      const manifestData = {
-        name: "Tic-Tac-Toe Pro",
-        short_name: "TicTacToe",
-        description: "Professional Tic-Tac-Toe Game with Real-Time Online Multiplayer",
-        start_url: "./",
-        display: "standalone",
-        background_color: "#0f172a",
-        theme_color: "#0f172a",
-        icons: [{
-          src: document.getElementById('app-icon').href,
-          sizes: "512x512",
-          type: "image/svg+xml",
-          purpose: "any maskable"
-        }]
-      };
-      const manifestBlob = new Blob([JSON.stringify(manifestData)], { type: 'application/json' });
-      document.getElementById('manifest-placeholder').setAttribute('href', URL.createObjectURL(manifestBlob));
-
-      if ('serviceWorker' in navigator) {
-        try {
-          const swCode = `
-            self.addEventListener('install', (e) => self.skipWaiting());
-            self.addEventListener('activate', (e) => clients.claim());
-            self.addEventListener('fetch', (e) => {
-              e.respondWith(caches.match(e.request).then(res => res || fetch(e.request).catch(() => new Response("Offline"))));
-            });
-          `;
-          const swBlob = new Blob([swCode], { type: 'text/javascript' });
-          navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(() => {});
-        } catch(e) {}
-      }
+      try {
+        const manifestData = {
+          name: "Tic-Tac-Toe Pro",
+          short_name: "TicTacToe",
+          description: "Professional Tic-Tac-Toe Game with Real-Time Online Multiplayer",
+          start_url: "./",
+          display: "standalone",
+          background_color: "#0f172a",
+          theme_color: "#0f172a",
+          icons: [{
+            src: document.getElementById('app-icon').href,
+            sizes: "512x512",
+            type: "image/svg+xml",
+            purpose: "any maskable"
+          }]
+        };
+        const manifestBlob = new Blob([JSON.stringify(manifestData)], { type: 'application/json' });
+        document.getElementById('manifest-placeholder').setAttribute('href', URL.createObjectURL(manifestBlob));
+      } catch (e) {}
     }
     setupPWA();
 
-    // Audio Synthesizer
+    // Audio Engine with Auto-Resume Support
     class AudioFX {
       constructor() {
         this.ctx = null;
@@ -345,6 +333,9 @@
         if (!this.ctx) {
           const AudioContext = window.AudioContext || window.webkitAudioContext;
           if (AudioContext) this.ctx = new AudioContext();
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume().catch(() => {});
         }
       }
 
@@ -397,13 +388,24 @@
     let gameMode = 'ai'; // 'ai', 'pvp', 'online'
     let difficulty = 'unbeatable';
     let history = [];
+    let aiTimeoutId = null;
 
-    // PeerJS Online Variables
-    let peer = null;
-    let conn = null;
+    // Online Network Variables
+    let mqttClient = null;
+    let isWebsocketBlocked = false;
+    let myClientId = 'user_' + Math.random().toString(36).substr(2, 9);
     let currentRoomId = null;
     let playerRole = null; // 'X' or 'O'
-    const netChannel = new BroadcastChannel('ttt_p2p_channel');
+    let currentTopic = null;
+
+    // Local Broadcast Channel Fallback
+    const localChannel = new BroadcastChannel('ttt_canvas_local_sync');
+
+    localChannel.onmessage = (event) => {
+      if (event.data && event.data.roomId === currentRoomId && event.data.senderId !== myClientId) {
+        handleNetworkPayload(event.data);
+      }
+    };
 
     let stats = { x: 0, o: 0, ties: 0 };
 
@@ -445,7 +447,7 @@
       toast.classList.remove('opacity-0', 'pointer-events-none');
       setTimeout(() => {
         toast.classList.add('opacity-0', 'pointer-events-none');
-      }, 3000);
+      }, 3500);
     }
 
     function loadSavedState() {
@@ -482,6 +484,10 @@
     }
 
     function initGame() {
+      if (aiTimeoutId) {
+        clearTimeout(aiTimeoutId);
+        aiTimeoutId = null;
+      }
       board = Array(9).fill(null);
       currentPlayer = 'X';
       isGameActive = true;
@@ -489,7 +495,7 @@
       hideWinningLine();
       cells.forEach(cell => {
         cell.innerHTML = '';
-        cell.classList.remove('cell-glow-x', 'cell-glow-o', 'opacity-50');
+        cell.classList.remove('cell-glow-x', 'cell-glow-o', 'opacity-50', 'opacity-60');
       });
       updateTurnStatusUI();
       updateUndoButton();
@@ -533,6 +539,8 @@
     function handleCellClick(index) {
       if (!isGameActive || board[index] !== null) return;
 
+      soundEngine.init();
+
       if (gameMode === 'online') {
         if (!currentRoomId || currentPlayer !== playerRole) {
           showToast(currentPlayer !== playerRole ? "Wait for your turn!" : "Join a room first!");
@@ -549,8 +557,9 @@
       if (isGameActive && gameMode === 'ai' && currentPlayer === 'O') {
         updateTurnStatusUI();
         const delay = Math.floor(Math.random() * 200) + 300;
-        setTimeout(() => {
-          if (!isGameActive) return;
+        aiTimeoutId = setTimeout(() => {
+          aiTimeoutId = null;
+          if (!isGameActive || gameMode !== 'ai') return;
           const aiMove = getAIMove();
           if (aiMove !== null && aiMove !== undefined) {
             makeMove(aiMove, 'O');
@@ -583,6 +592,11 @@
 
     function handleUndo() {
       if (!isGameActive || history.length === 0 || gameMode === 'online') return;
+
+      if (aiTimeoutId) {
+        clearTimeout(aiTimeoutId);
+        aiTimeoutId = null;
+      }
 
       if (gameMode === 'ai') {
         if (history.length >= 2) {
@@ -622,6 +636,10 @@
 
     function handleWin(winInfo) {
       isGameActive = false;
+      if (aiTimeoutId) {
+        clearTimeout(aiTimeoutId);
+        aiTimeoutId = null;
+      }
       const winner = winInfo.winner;
       stats[winner.toLowerCase()]++;
       saveStats();
@@ -645,18 +663,24 @@
       statusIndicator.className = `w-2.5 h-2.5 rounded-full ${winner === 'X' ? 'bg-blue-500' : 'bg-pink-500'}`;
 
       if (typeof confetti === 'function') {
-        confetti({
-          particleCount: 80,
-          spread: 70,
-          origin: { y: 0.6 },
-          colors: winner === 'X' ? ['#3b82f6', '#60a5fa'] : ['#ec4899', '#f472b6']
-        });
+        try {
+          confetti({
+            particleCount: 80,
+            spread: 70,
+            origin: { y: 0.6 },
+            colors: winner === 'X' ? ['#3b82f6', '#60a5fa'] : ['#ec4899', '#f472b6']
+          });
+        } catch(e){}
       }
       updateUndoButton();
     }
 
     function handleTie() {
       isGameActive = false;
+      if (aiTimeoutId) {
+        clearTimeout(aiTimeoutId);
+        aiTimeoutId = null;
+      }
       stats.ties++;
       saveStats();
       updateScoreboardUI();
@@ -695,7 +719,7 @@
       winningLine.classList.remove('win-line');
     }
 
-    // AI Minimax
+    // AI Minimax Engine
     function getAIMove() {
       const emptyIndices = board.map((val, idx) => val === null ? idx : null).filter(val => val !== null);
       if (emptyIndices.length === 0) return null;
@@ -708,7 +732,7 @@
       }
 
       let bestScore = -Infinity;
-      let move = null;
+      let move = emptyIndices[0];
       for (let i = 0; i < 9; i++) {
         if (board[i] === null) {
           board[i] = 'O';
@@ -757,7 +781,7 @@
       }
     }
 
-    // REAL-TIME ONLINE ENGINE (PEERJS WEBRTC + LOCAL FALLBACK)
+    // REAL-TIME ONLINE NETWORK ENGINE
     function generateRoomCode() {
       const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
       let code = '';
@@ -767,85 +791,135 @@
       return code;
     }
 
-    function initPeerEngine(peerId) {
-      if (typeof Peer === 'undefined') return;
+    function updateNetworkStatusUI(status, isLive) {
+      const netStatus = document.getElementById('network-status');
+      netStatus.innerHTML = `<span class="w-2 h-2 rounded-full ${isLive ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}"></span> ${status}`;
+      netStatus.className = `text-[11px] font-bold ${isLive ? 'text-emerald-500' : 'text-amber-500'} flex items-center gap-1`;
+    }
+
+    function initMQTTNetwork() {
+      if (mqttClient || isWebsocketBlocked) return;
+      
       try {
-        if (peer) peer.destroy();
-        peer = new Peer(peerId ? 'ttt-pro-' + peerId : undefined, { debug: 0 });
-
-        peer.on('connection', (c) => {
-          conn = c;
-          setupConnectionListeners();
-          labelPlayerO.innerText = "Opponent (O)";
-          showToast("Opponent joined!");
-          broadcastP2PState();
-        });
-
-        peer.on('error', (err) => {
-          // Graceful fallback for restricted network policies
-        });
-      } catch(e) {}
-    }
-
-    function setupConnectionListeners() {
-      if (!conn) return;
-      conn.on('data', (data) => {
-        if (data.type === 'P2P_STATE') {
-          receiveP2PState(data.state);
+        if (typeof mqtt === 'undefined') {
+          isWebsocketBlocked = true;
+          updateNetworkStatusUI('Local Sync Active', false);
+          return;
         }
-      });
-      conn.on('close', () => {
-        showToast("Opponent disconnected");
-      });
+
+        mqttClient = mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
+          clientId: myClientId,
+          keepalive: 60,
+          clean: true,
+          connectTimeout: 4000,
+          reconnectPeriod: 2000
+        });
+
+        mqttClient.on('connect', () => {
+          updateNetworkStatusUI('Network Active', true);
+        });
+
+        mqttClient.on('error', (err) => {
+          isWebsocketBlocked = true;
+          updateNetworkStatusUI('Local Sync Active', false);
+          if (mqttClient) {
+            try { mqttClient.end(true); } catch(e){}
+            mqttClient = null;
+          }
+        });
+
+        mqttClient.on('message', (topic, message) => {
+          try {
+            const data = JSON.parse(message.toString());
+            if (data.senderId === myClientId) return;
+            handleNetworkPayload(data);
+          } catch(e) {}
+        });
+      } catch (e) {
+        isWebsocketBlocked = true;
+        updateNetworkStatusUI('Local Sync Active', false);
+      }
     }
 
-    netChannel.onmessage = (e) => {
-      if (e.data && e.data.roomId === currentRoomId && e.data.type === 'P2P_STATE') {
-        receiveP2PState(e.data.state);
-      }
-    };
+    function publishMessage(payload) {
+      payload.senderId = myClientId;
+      payload.roomId = currentRoomId;
 
-    function broadcastP2PState() {
-      const state = {
-        board: board,
-        turn: currentPlayer,
-        isGameActive: isGameActive,
-        roomId: currentRoomId
-      };
+      localChannel.postMessage(payload);
 
-      if (conn && conn.open) {
-        conn.send({ type: 'P2P_STATE', state: state });
+      if (mqttClient && currentTopic && !isWebsocketBlocked) {
+        try {
+          mqttClient.publish(currentTopic, JSON.stringify(payload));
+        } catch(e) {}
       }
-      netChannel.postMessage({ type: 'P2P_STATE', roomId: currentRoomId, state: state });
     }
 
-    function receiveP2PState(state) {
-      board = state.board;
-      currentPlayer = state.turn;
-      isGameActive = state.isGameActive;
+    function handleNetworkPayload(data) {
+      if (data.type === 'JOIN_REQUEST') {
+        labelPlayerO.innerText = "Opponent (O)";
+        showToast("Opponent joined!");
+        publishMessage({
+          type: 'GAME_STATE',
+          board: board,
+          turn: currentPlayer,
+          isGameActive: isGameActive
+        });
+      } else if (data.type === 'GAME_STATE') {
+        board = data.board;
+        currentPlayer = data.turn;
+        isGameActive = data.isGameActive;
 
-      cells.forEach((cell, idx) => {
-        const val = board[idx];
-        cell.innerHTML = val === 'X' ? getXSVG() : (val === 'O' ? getOSVG() : '');
-      });
+        cells.forEach((cell, idx) => {
+          const val = board[idx];
+          cell.innerHTML = val === 'X' ? getXSVG() : (val === 'O' ? getOSVG() : '');
+        });
 
-      const winInfo = checkWin(board);
-      if (winInfo) {
-        handleWin(winInfo);
-      } else if (board.every(cell => cell !== null)) {
-        handleTie();
-      } else {
-        hideWinningLine();
-        updateTurnStatusUI();
+        const winInfo = checkWin(board);
+        if (winInfo) {
+          handleWin(winInfo);
+        } else if (board.every(cell => cell !== null)) {
+          handleTie();
+        } else {
+          hideWinningLine();
+          updateTurnStatusUI();
+        }
+      } else if (data.type === 'MAKE_MOVE') {
+        board[data.index] = data.player;
+        cells[data.index].innerHTML = data.player === 'X' ? getXSVG() : getOSVG();
+
+        if (data.player === 'X') soundEngine.playX();
+        else soundEngine.playO();
+
+        const winInfo = checkWin(board);
+        if (winInfo) {
+          handleWin(winInfo);
+        } else if (board.every(cell => cell !== null)) {
+          handleTie();
+        } else {
+          currentPlayer = data.player === 'X' ? 'O' : 'X';
+          updateTurnStatusUI();
+        }
+      } else if (data.type === 'RESET_MATCH') {
+        initGame();
+        showToast("Opponent restarted match!");
+      } else if (data.type === 'LEAVE_ROOM') {
+        labelPlayerO.innerText = "Waiting...";
+        showToast("Opponent left room");
       }
     }
 
     function createOnlineRoom() {
+      initMQTTNetwork();
       const code = generateRoomCode();
       currentRoomId = code;
+      currentTopic = 'tictactoe_pro_game_v1/' + code;
       playerRole = 'X';
-      displayRoomCode.innerText = code;
 
+      if (mqttClient && !isWebsocketBlocked) {
+        try { mqttClient.subscribe(currentTopic); } catch(e){}
+      }
+
+      displayRoomCode.innerText = code;
       onlineInitialControls.classList.add('hidden');
       onlineActiveControls.classList.remove('hidden');
 
@@ -853,11 +927,11 @@
       labelPlayerO.innerText = "Waiting...";
 
       initGame();
-      initPeerEngine(code);
-      showToast("Room created! Share code: " + code);
+      showToast("Room created! Code: " + code);
     }
 
     function joinOnlineRoom(providedCode) {
+      initMQTTNetwork();
       const code = (providedCode || roomCodeInput.value).trim().toUpperCase();
       if (!code || code.length !== 6) {
         showToast("Enter a 6-character room code");
@@ -865,9 +939,14 @@
       }
 
       currentRoomId = code;
+      currentTopic = 'tictactoe_pro_game_v1/' + code;
       playerRole = 'O';
-      displayRoomCode.innerText = code;
 
+      if (mqttClient && !isWebsocketBlocked) {
+        try { mqttClient.subscribe(currentTopic); } catch(e){}
+      }
+
+      displayRoomCode.innerText = code;
       onlineInitialControls.classList.add('hidden');
       onlineActiveControls.classList.remove('hidden');
 
@@ -875,27 +954,28 @@
       labelPlayerO.innerText = "You (O)";
 
       initGame();
-      initPeerEngine();
 
       setTimeout(() => {
-        if (peer) {
-          conn = peer.connect('ttt-pro-' + code);
-          setupConnectionListeners();
-        }
-      }, 500);
+        publishMessage({ type: 'JOIN_REQUEST' });
+      }, 300);
 
-      broadcastP2PState();
       showToast("Joined room " + code);
     }
 
     function makeOnlineMove(index) {
-      if (!currentRoomId || board[index] !== null) return;
+      if (!currentRoomId || board[index] !== null || !isGameActive) return;
 
       board[index] = playerRole;
       cells[index].innerHTML = playerRole === 'X' ? getXSVG() : getOSVG();
 
       if (playerRole === 'X') soundEngine.playX();
       else soundEngine.playO();
+
+      publishMessage({
+        type: 'MAKE_MOVE',
+        index: index,
+        player: playerRole
+      });
 
       const winInfo = checkWin(board);
       if (winInfo) {
@@ -906,20 +986,21 @@
         currentPlayer = playerRole === 'X' ? 'O' : 'X';
         updateTurnStatusUI();
       }
-
-      broadcastP2PState();
     }
 
     function resetOnlineGame() {
       initGame();
-      broadcastP2PState();
-      showToast("New online match started!");
+      publishMessage({ type: 'RESET_MATCH' });
+      showToast("New match started!");
     }
 
     function leaveOnlineRoom() {
-      if (conn) conn.close();
-      if (peer) peer.destroy();
+      if (mqttClient && currentTopic && !isWebsocketBlocked) {
+        publishMessage({ type: 'LEAVE_ROOM' });
+        try { mqttClient.unsubscribe(currentTopic); } catch(e){}
+      }
       currentRoomId = null;
+      currentTopic = null;
       playerRole = null;
       onlineActiveControls.classList.add('hidden');
       onlineInitialControls.classList.remove('hidden');
@@ -959,6 +1040,7 @@
     });
 
     restartBtn.addEventListener('click', () => {
+      soundEngine.init();
       if (gameMode === 'online' && currentRoomId) {
         resetOnlineGame();
       } else {
@@ -969,6 +1051,7 @@
     undoBtn.addEventListener('click', handleUndo);
 
     modeAiBtn.addEventListener('click', () => {
+      soundEngine.init();
       if (gameMode === 'online') leaveOnlineRoom();
       gameMode = 'ai';
       modeAiBtn.className = "py-1.5 rounded-lg text-center transition font-bold bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm";
@@ -982,6 +1065,7 @@
     });
 
     modePvpBtn.addEventListener('click', () => {
+      soundEngine.init();
       if (gameMode === 'online') leaveOnlineRoom();
       gameMode = 'pvp';
       modePvpBtn.className = "py-1.5 rounded-lg text-center transition font-bold bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm";
@@ -995,6 +1079,7 @@
     });
 
     modeOnlineBtn.addEventListener('click', () => {
+      soundEngine.init();
       gameMode = 'online';
       modeOnlineBtn.className = "py-1.5 rounded-lg text-center transition font-bold bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm flex items-center justify-center gap-1";
       modeAiBtn.className = "py-1.5 rounded-lg text-center transition font-bold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white";
@@ -1002,6 +1087,7 @@
       difficultyWrapper.classList.add('hidden');
       onlineWrapper.classList.remove('hidden');
       initGame();
+      initMQTTNetwork();
     });
 
     difficultySelect.addEventListener('change', (e) => {
@@ -1038,6 +1124,7 @@
 
     soundBtn.addEventListener('click', () => {
       soundEngine.enabled = !soundEngine.enabled;
+      if (soundEngine.enabled) soundEngine.init();
       localStorage.setItem('ttt_pro_sound', soundEngine.enabled ? 'true' : 'false');
       updateSoundIcon();
     });
@@ -1053,7 +1140,7 @@
       loadSavedState();
       initGame();
 
-      // Check for room code in URL query params (e.g. ?room=ABC123)
+      // Check for room code in URL query params
       const urlParams = new URLSearchParams(window.location.search);
       const roomParam = urlParams.get('room');
       if (roomParam && roomParam.length === 6) {
